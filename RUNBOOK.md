@@ -154,6 +154,39 @@ git pull --ff-only
 git switch -c codex/lab-2-security-scanning
 ```
 
+### What The Branch Name Means
+
+`codex/lab-2-security-scanning` is a Git branch name, not a folder in the
+project directory.
+
+The slash is a naming convention that helps organize branches visually in
+GitLab. It does not create a project folder named `codex`.
+
+Think of branches as movable labels pointing to commits:
+
+```text
+main                          -> 80e2110
+codex/lab-2-security-scanning -> cc574ed
+```
+
+When you run:
+
+```bash
+git push -u origin codex/lab-2-security-scanning
+```
+
+you are telling Git to:
+
+1. Push the local branch named `codex/lab-2-security-scanning`.
+2. Create the same branch name on GitLab if it does not already exist.
+3. Set that GitLab branch as the upstream branch.
+
+After the upstream is set, future pushes from that branch can usually be:
+
+```bash
+git push
+```
+
 Add GitLab security scanning templates to `.gitlab-ci.yml`:
 
 ```yaml
@@ -193,7 +226,69 @@ Do not merge immediately. Inspect:
 - `Secure > Vulnerability report`
 - Merge request security widget
 
-## 9. Useful Daily Git Commands
+## 9. Reading The Merge Request Security Widget
+
+After pushing the security scanning branch and opening a merge request, GitLab
+can show a security widget on the MR overview.
+
+Example:
+
+```text
+Security scanning detected 26 new potential vulnerabilities
+1 critical, 15 high, and 10 others
+```
+
+This is the key DevSecOps lesson:
+
+```text
+Pipeline passed does not mean the change is secure.
+```
+
+It means the jobs ran successfully. Security scanners can complete successfully
+and still report serious findings.
+
+In this lab:
+
+- `hello_pipeline` proves basic CI works.
+- `semgrep-sast` performs Static Application Security Testing.
+- `secret_detection` scans for committed credentials.
+- `gemnasium-python-dependency_scanning` checks Python dependencies for known
+  vulnerable packages.
+
+The MR might still say `Ready to merge` because the current project rules allow
+the merge. That does not mean the vulnerabilities are acceptable. It means
+detection exists, but enforcement has not been configured yet.
+
+When reviewing the MR security report, open a finding and inspect:
+
+- File path
+- Line number
+- Severity
+- Identifier, such as `bandit.B602`, `bandit.B608`, or a CVE
+- Scanner type
+- Remediation guidance
+
+Typical findings in this lab:
+
+- `bandit.B602`: command injection from shell execution.
+- `bandit.B608`: SQL injection from string-built SQL.
+- `bandit.B307`: eval injection from dynamically evaluated code.
+- Dependency CVEs: known vulnerabilities from old package versions in
+  `requirements.txt`.
+
+Status meanings:
+
+- `Needs triage`: GitLab found it, but no human has accepted, dismissed, or
+  resolved it yet.
+- `Detected`: the scanner reported the issue.
+- `Resolved`: a later scan no longer finds the issue.
+- `Dismissed`: a human decided not to act on the finding, ideally with a clear
+  reason.
+
+Do not merge this training MR until the lab asks you to. It intentionally
+contains vulnerable code so you can practice triage and remediation.
+
+## 10. Useful Daily Git Commands
 
 Check current branch and file state:
 
@@ -237,10 +332,15 @@ Push a new branch and set upstream:
 git push -u origin BRANCH_NAME
 ```
 
-## 10. What To Remember
+## 11. What To Remember
 
 - A local commit does not run a GitLab pipeline until it is pushed.
 - GitLab creates pipelines from `.gitlab-ci.yml`.
 - YAML validity is checked before jobs are created.
 - Security scanners are usually most useful in merge requests.
+- A branch is a Git pointer, not a visible project folder.
+- A passing pipeline means the automation ran successfully, not that the code is
+  automatically secure.
+- `Ready to merge` means current project rules allow the merge. It does not mean
+  the security findings are resolved.
 - Keep risky training code isolated and clearly marked as intentionally unsafe.
