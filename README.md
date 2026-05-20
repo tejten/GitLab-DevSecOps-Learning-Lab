@@ -41,3 +41,16 @@ After pushing this branch, open a merge request and inspect:
 - Build > Pipelines
 - Secure > Vulnerability report
 - The merge request security widget
+
+## Lab 3
+
+The third lab remediates the findings from Lab 2:
+
+- SQL injection is fixed with a parameterized query.
+- Command injection is fixed by removing shell execution.
+- Eval injection is fixed by removing dynamic evaluation.
+- Debug mode is disabled for normal app startup.
+- Vulnerable dependency pins are updated to current maintained releases.
+
+After pushing the remediation commit to the same branch, GitLab reruns the
+pipeline and updates the merge request security report.

@@ -288,7 +288,79 @@ Status meanings:
 Do not merge this training MR until the lab asks you to. It intentionally
 contains vulnerable code so you can practice triage and remediation.
 
-## 10. Useful Daily Git Commands
+## 10. Lab 3: Remediate Findings
+
+Use the same merge request branch:
+
+```bash
+cd "/Users/ttenmattam/Documents/Learn Gitlab"
+git status --short --branch
+```
+
+Expected branch:
+
+```text
+codex/lab-2-security-scanning
+```
+
+Lab 3 fixes the issues reported by Lab 2.
+
+SAST remediation patterns:
+
+- SQL injection: replace string-built SQL with parameterized SQL.
+- Command injection: remove shell execution and avoid passing user input to a
+  shell.
+- Eval injection: remove `eval` and other dynamic code execution.
+- Debug exposure: do not start Flask with `debug=True`.
+
+Dependency remediation pattern:
+
+- Replace vulnerable package pins with maintained versions.
+- Prefer exact pins for reproducible training labs.
+- Re-run dependency scanning after the update.
+
+The dependency pins used in this lab were checked against PyPI on
+May 20, 2026:
+
+```text
+Flask==3.1.3
+Jinja2==3.1.6
+Werkzeug==3.1.8
+```
+
+Stage, commit, and push the remediation:
+
+```bash
+git add README.md RUNBOOK.md requirements.txt src/training_app.py
+git commit -m "Remediate training app vulnerabilities"
+git push
+```
+
+Then return to the open merge request and inspect:
+
+- Latest pipeline
+- Security widget
+- Security report
+- Vulnerability statuses
+
+Important lesson:
+
+```text
+Security remediation is a feedback loop.
+```
+
+The loop is:
+
+1. Scanner detects a finding.
+2. Engineer reads the finding in context.
+3. Engineer changes code or dependencies.
+4. Pipeline runs again.
+5. GitLab updates the MR security report.
+
+If a finding remains, repeat the loop. If a finding disappears from the latest
+scan, GitLab can mark it as resolved.
+
+## 11. Useful Daily Git Commands
 
 Check current branch and file state:
 
@@ -332,7 +404,7 @@ Push a new branch and set upstream:
 git push -u origin BRANCH_NAME
 ```
 
-## 11. What To Remember
+## 12. What To Remember
 
 - A local commit does not run a GitLab pipeline until it is pushed.
 - GitLab creates pipelines from `.gitlab-ci.yml`.
@@ -343,4 +415,6 @@ git push -u origin BRANCH_NAME
   automatically secure.
 - `Ready to merge` means current project rules allow the merge. It does not mean
   the security findings are resolved.
+- Remediation is not done when the code is edited. It is done when the next scan
+  confirms the finding is gone or intentionally accepted.
 - Keep risky training code isolated and clearly marked as intentionally unsafe.
