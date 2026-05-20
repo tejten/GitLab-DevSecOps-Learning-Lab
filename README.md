@@ -24,3 +24,20 @@ After pushing this repository to GitLab, open:
 - The `hello_pipeline` job logs
 
 You should see the commit, branch, and pipeline ID printed by the job.
+
+## Lab 2
+
+The second lab turns basic CI into DevSecOps by adding security scanners:
+
+- Static Application Security Testing (SAST) scans source code for vulnerable patterns.
+- Secret detection scans repository content for accidentally committed credentials.
+- Dependency scanning checks open source packages against known vulnerability data.
+
+The `src/training_app.py` file is intentionally unsafe. Do not deploy it. It exists so
+the scanners have realistic issues to report.
+
+After pushing this branch, open a merge request and inspect:
+
+- Build > Pipelines
+- Secure > Vulnerability report
+- The merge request security widget
