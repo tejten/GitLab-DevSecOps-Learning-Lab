@@ -54,3 +54,16 @@ The third lab remediates the findings from Lab 2:
 
 After pushing the remediation commit to the same branch, GitLab reruns the
 pipeline and updates the merge request security report.
+
+## Lab 4
+
+The fourth lab moves from scanning to governance:
+
+- Merge the clean security-scanning MR into `main`.
+- Protect `main` so changes flow through merge requests.
+- Add merge request approval expectations.
+- Add a merge request approval policy for high-risk security findings.
+- Test the policy with a deliberately risky branch.
+
+This is where DevSecOps shifts from "we can detect risk" to "the platform can
+enforce review before risky changes land."
