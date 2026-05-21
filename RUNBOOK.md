@@ -370,48 +370,12 @@ Goal:
 Risky changes should be visible, reviewed, and blocked when policy requires it.
 ```
 
-### Step 1: Merge The Clean MR
-
-Only do this after the MR says:
-
-```text
-Security scanning detected no new potential vulnerabilities
-```
-
-In the merge request, select `Merge`.
-
-If `Delete source branch` is selected, GitLab deletes the remote feature branch
-after the merge. That is normal. The code lands on `main`; the temporary branch
-is no longer needed.
-
-Sync your local repository afterward:
-
-```bash
-cd "/Users/ttenmattam/Documents/Learn Gitlab"
-git switch main
-git pull --ff-only origin main
-```
-
-Optional local cleanup:
-
-```bash
-git branch -d codex/lab-2-security-scanning
-```
-
-### Step 2: Protect `main`
-
-GitLab now configures protected branches under branch rules.
+### Protect `main`
 
 In GitLab:
 
 ```text
-Settings > Repository > Branch rules
-```
-
-Open or create the rule for:
-
-```text
-main
+Settings > Repository > Branch rules > main
 ```
 
 Recommended learning-lab settings:
@@ -428,12 +392,9 @@ Why:
 - `Allowed to merge: Maintainers` lets maintainers merge reviewed MRs.
 - `Allowed to push and merge: No one` prevents direct pushes to `main`.
 - Force-push stays off so history cannot be rewritten casually.
-- Code owner approval comes later, after we add `CODEOWNERS`.
+- Code owner approval comes later, after adding `CODEOWNERS`.
 
-Current GitLab docs note that `Allowed to push and merge` must be explicitly set
-to `No one` if you want to prevent direct pushes.
-
-### Step 3: Add A Basic MR Approval Rule
+### Add A Basic MR Approval Rule
 
 In GitLab:
 
@@ -441,33 +402,22 @@ In GitLab:
 Settings > Merge requests > Merge request approvals
 ```
 
-Add an approval rule:
+Suggested rule:
 
 ```text
 Rule name: Code review required
 Approvals required: 1
 Target branch: All protected branches
-Approvers: a teammate or reviewer group
+Approvers: a teammate, reviewer group, or maintainer group
 ```
 
 Solo trial note:
 
-If you are the only project member, do not create a hard approval rule that only
-you can satisfy while also preventing authors from approving their own MRs. That
-can create an intentionally blocked lab setup. In a real organization, use a
-reviewer group such as security, platform, or maintainers.
+If you are the only project member, avoid creating a hard rule that blocks MR
+authors from approving their own changes unless another eligible approver exists.
+That is realistic governance, but it can intentionally lock a solo lab.
 
-Concept:
-
-```text
-Approval rules make review explicit.
-Branch protection makes the rule matter for important branches.
-```
-
-### Step 4: Add A Security Approval Policy
-
-Security approval policies are Ultimate-tier controls that require approval when
-scanner findings meet policy conditions.
+### Add A Security Approval Policy
 
 In GitLab:
 
@@ -475,35 +425,50 @@ In GitLab:
 Secure > Policies > New policy > Merge request approval policy
 ```
 
-Create a policy like:
+Suggested policy:
 
 ```text
 Name: Require security approval for high risk findings
 Status: Enabled
-
-IF Security Scan from SAST and Dependency Scanning finds more than 0
-Critical or High vulnerabilities in an open merge request targeting
-All protected branches
-
-THEN require approval from 1 approver
+Policy enforcement: Strictly enforced for blocking behavior, Warn mode for solo practice
+Target branches: All protected branches
+Scanners: SAST and Dependency Scanning
+Severity: Critical and High
+Threshold: More than 0 vulnerabilities
+Action: Require 1 approval
+Approver: security group, maintainer group, or eligible reviewer
 ```
 
-Choose an eligible approver or group. In a real team, this is usually a security
-or application-owner group.
+Expected policy YAML shape:
 
-GitLab creates or updates a security policy project and opens a merge request
-for the policy. Merge that policy MR to activate the policy.
+```yaml
+approval_policy:
+  - name: Require security approval for high risk findings
+    enabled: true
+    enforcement_type: enforce
+    rules:
+      - type: scan_finding
+        branch_type: protected
+        scanners:
+          - sast
+          - dependency_scanning
+        vulnerabilities_allowed: 0
+        severity_levels:
+          - critical
+          - high
+        vulnerability_states:
+          - new_needs_triage
+    actions:
+      - type: require_approval
+        approvals_required: 1
+```
 
-Important behavior:
+GitLab may create or update a security policy project and open a merge request
+for the policy. Merge that policy MR to activate it.
 
-- Security approval policies apply to protected target branches.
-- Scanner jobs must produce security reports for GitLab to evaluate the policy.
-- If GitLab cannot evaluate the policy safely, it may require approval instead
-  of silently allowing the MR.
+### Test The Policy
 
-### Step 5: Test The Policy With A Bad Branch
-
-After the policy is active, create a test branch from `main`:
+Create a deliberately risky test branch:
 
 ```bash
 git switch main
@@ -511,10 +476,322 @@ git pull --ff-only origin main
 git switch -c codex/lab-4-policy-test
 ```
 
-Add a deliberately risky file:
+Add the temporary file shown in the Lab Change Ledger, then push:
+
+```bash
+git add src/policy_test.py
+git commit -m "Test security approval policy"
+git push -u origin codex/lab-4-policy-test
+```
+
+Open an MR:
+
+```text
+codex/lab-4-policy-test -> main
+```
+
+Expected result:
+
+- SAST reports a new high-risk finding.
+- The MR shows a required approval or warning, depending on policy mode.
+- The MR should not be merged as-is.
+
+Close this test MR after observing the policy.
+
+## 12. Lab Change Ledger
+
+Use this section when you want to repeat the labs from scratch or explain what
+changed in each lab.
+
+### How To Inspect Lab Changes With Git
+
+Show the commit timeline:
+
+```bash
+git log --oneline --decorate --reverse
+```
+
+Show what a lab commit changed:
+
+```bash
+git show --stat COMMIT_SHA
+git show COMMIT_SHA -- FILE_PATH
+```
+
+Compare two lab points:
+
+```bash
+git diff OLD_COMMIT..NEW_COMMIT -- FILE_PATH
+```
+
+### Lab 1: First Pipeline
+
+Files created:
+
+```text
+README.md
+.gitlab-ci.yml
+```
+
+Purpose:
+
+```text
+Prove that GitLab can create and run a pipeline from this repository.
+```
+
+Final `.gitlab-ci.yml` after the YAML quoting fix:
+
+```yaml
+stages:
+  - verify
+
+hello_pipeline:
+  stage: verify
+  image: alpine:3.20
+  script:
+    - 'echo "GitLab pipeline is alive."'
+    - 'echo "Project: $CI_PROJECT_PATH"'
+    - 'echo "Branch: $CI_COMMIT_BRANCH"'
+    - 'echo "Commit: $CI_COMMIT_SHA"'
+    - 'echo "Pipeline: $CI_PIPELINE_ID"'
+```
+
+Commands:
+
+```bash
+git add README.md .gitlab-ci.yml
+git commit -m "Start GitLab DevSecOps learning lab"
+git push -u origin main
+```
+
+YAML fix command:
+
+```bash
+git add .gitlab-ci.yml
+git commit -m "Fix CI script YAML quoting"
+git push
+```
+
+### Lab 2: Add Security Scanning
+
+Files changed or created:
+
+```text
+.gitignore
+.gitlab-ci.yml
+README.md
+requirements.txt
+src/training_app.py
+```
+
+Purpose:
+
+```text
+Create a deliberately vulnerable branch so GitLab SAST and dependency scanning
+have real findings to report in a merge request.
+```
+
+Security templates added to `.gitlab-ci.yml`:
+
+```yaml
+include:
+  - template: Jobs/SAST.gitlab-ci.yml
+  - template: Jobs/Secret-Detection.gitlab-ci.yml
+  - template: Jobs/Dependency-Scanning.gitlab-ci.yml
+
+stages:
+  - verify
+  - test
+```
+
+Vulnerable `requirements.txt` used for dependency scanning practice:
+
+```text
+Flask==0.12.2
+Jinja2==2.10
+Werkzeug==0.14.1
+```
+
+Vulnerable `src/training_app.py` used for SAST practice:
 
 ```python
-# src/policy_test.py
+"""Intentionally vulnerable training app for GitLab security scanning.
+
+Do not deploy this app. It exists so SAST and dependency scanning have
+real examples to detect during the DevSecOps learning labs.
+"""
+
+import sqlite3
+import subprocess
+
+from flask import Flask, request
+
+
+app = Flask(__name__)
+
+
+def find_customer(customer_id):
+    conn = sqlite3.connect("customers.db")
+    query = f"SELECT * FROM customers WHERE id = '{customer_id}'"
+    return conn.execute(query).fetchall()
+
+
+@app.route("/ping")
+def ping():
+    host = request.args.get("host", "127.0.0.1")
+    return subprocess.check_output(f"ping -c 1 {host}", shell=True, text=True)
+
+
+@app.route("/debug")
+def debug():
+    expression = request.args.get("expr", "1 + 1")
+    return str(eval(expression))
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
+```
+
+Findings this version should produce:
+
+```text
+SQL injection
+Command injection
+Eval injection
+Active debug code
+Multiple dependency CVEs
+```
+
+Commands:
+
+```bash
+git switch main
+git pull --ff-only origin main
+git switch -c codex/lab-2-security-scanning
+git add .gitlab-ci.yml README.md .gitignore requirements.txt src/training_app.py
+git commit -m "Add security scanning lab"
+git push -u origin codex/lab-2-security-scanning
+```
+
+### Lab 3: Remediate Security Findings
+
+Files changed:
+
+```text
+README.md
+RUNBOOK.md
+requirements.txt
+src/training_app.py
+```
+
+Purpose:
+
+```text
+Replace vulnerable code and package versions, then let GitLab rescan the same
+merge request to confirm the findings are gone.
+```
+
+Remediated `requirements.txt`:
+
+```text
+Flask==3.1.3
+Jinja2==3.1.6
+Werkzeug==3.1.8
+```
+
+Remediated `src/training_app.py`:
+
+```python
+"""Small training app used by the GitLab DevSecOps learning labs."""
+
+import ipaddress
+import sqlite3
+
+from flask import Flask, request
+
+
+app = Flask(__name__)
+
+
+def find_customer(customer_id):
+    with sqlite3.connect("customers.db") as conn:
+        return conn.execute(
+            "SELECT * FROM customers WHERE id = ?",
+            (customer_id,),
+        ).fetchall()
+
+
+@app.route("/ping")
+def ping():
+    host = request.args.get("host", "127.0.0.1")
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        return {"error": "host must be an IP address"}, 400
+
+    return {"host": host, "status": "accepted"}
+
+
+@app.route("/debug")
+def debug():
+    return {"debug": False, "status": "ok"}
+
+
+if __name__ == "__main__":
+    app.run()
+```
+
+Security changes:
+
+```text
+String-built SQL -> parameterized SQL
+Shell command execution -> input validation and no shell execution
+eval() -> static debug response
+debug=True -> normal Flask startup
+Vulnerable dependency pins -> maintained package versions
+```
+
+Validation commands:
+
+```bash
+python3 -m py_compile src/training_app.py
+git diff --check
+rg "shell=True|eval\\(|debug=True|subprocess|Flask==0|Jinja2==2|Werkzeug==0" \
+  src requirements.txt README.md RUNBOOK.md
+```
+
+Commit and push:
+
+```bash
+git add README.md RUNBOOK.md requirements.txt src/training_app.py
+git commit -m "Remediate training app vulnerabilities"
+git push
+```
+
+Expected GitLab result:
+
+```text
+Security scanning detected no new potential vulnerabilities
+```
+
+### Lab 4: Governance Controls
+
+Files changed locally during the policy test:
+
+```text
+src/policy_test.py
+```
+
+Purpose:
+
+```text
+Prove that branch protection and security approval policies can require review
+for risky changes before they merge to main.
+```
+
+Temporary test file:
+
+```python
 from flask import request
 
 
@@ -523,53 +800,53 @@ def unsafe_debug_endpoint():
     return str(eval(expression))
 ```
 
-Commit and push:
+Commands to create the test branch:
 
 ```bash
+git switch main
+git pull --ff-only origin main
+git switch -c codex/lab-4-policy-test
 git add src/policy_test.py
 git commit -m "Test security approval policy"
 git push -u origin codex/lab-4-policy-test
 ```
 
-Open a merge request:
+Expected GitLab result:
 
 ```text
-codex/lab-4-policy-test -> main
+SAST reports a new high-risk finding.
+The merge request requires approval or warns according to policy mode.
 ```
 
-Expected result:
-
-- SAST reports a new finding.
-- The MR shows a required security approval.
-- The MR should not be casually mergeable until the policy requirement is met
-  or the finding is fixed.
-
-Close this test MR after observing the policy. It exists only to prove the
-control works.
-
-### Step 6: Fix Or Close The Test MR
-
-To fix it, remove the risky file:
+Cleanup after observing the policy:
 
 ```bash
-git rm src/policy_test.py
-git commit -m "Remove policy test vulnerability"
-git push
+git switch main
+git pull --ff-only origin main
+git branch -D codex/lab-4-policy-test
+git push origin --delete codex/lab-4-policy-test
+git fetch --prune
 ```
 
-Then wait for the pipeline and confirm the security approval requirement clears.
+Do not merge the policy test MR. It exists only to prove the policy behavior.
 
-If you are done with the demonstration, close the MR instead of merging it.
+## 13. Repeatability Notes
 
-Lab 4 takeaway:
+For every future lab, record:
 
-```text
-DevSecOps maturity is not just scanner coverage. It is scanner coverage plus
-branch protection, review rules, and policies that turn findings into enforceable
-workflow.
-```
+- Branch name.
+- Files changed.
+- Exact code snippet or configuration added.
+- Commit message.
+- Push command.
+- Expected GitLab pipeline or security result.
+- Cleanup command if the lab creates a temporary branch.
 
-## 12. Useful Daily Git Commands
+Prefer recording lab instructions in this runbook rather than adding historical
+comments inside application source files. Source comments should explain current
+code behavior; the runbook should explain the learning journey.
+
+## 14. Useful Daily Git Commands
 
 Check current branch and file state:
 
@@ -613,7 +890,7 @@ Push a new branch and set upstream:
 git push -u origin BRANCH_NAME
 ```
 
-## 13. What To Remember
+## 15. What To Remember
 
 - A local commit does not run a GitLab pipeline until it is pushed.
 - GitLab creates pipelines from `.gitlab-ci.yml`.
@@ -626,7 +903,6 @@ git push -u origin BRANCH_NAME
   the security findings are resolved.
 - Remediation is not done when the code is edited. It is done when the next scan
   confirms the finding is gone or intentionally accepted.
-- Branch protection prevents important branches from being changed casually.
-- Approval rules and security policies turn review expectations into platform
-  behavior.
+- Repeatable labs need a change ledger: files touched, exact snippets, commands,
+  expected GitLab result, and cleanup steps.
 - Keep risky training code isolated and clearly marked as intentionally unsafe.
