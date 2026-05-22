@@ -498,7 +498,159 @@ Expected result:
 
 Close this test MR after observing the policy.
 
-## 12. Lab Change Ledger
+## 12. Lab 5: CODEOWNERS
+
+Lab 5 maps repository files to accountable owners.
+
+Goal:
+
+```text
+Changes to sensitive or owned paths should request review from the right people.
+```
+
+### Add CODEOWNERS
+
+Create:
+
+```text
+.gitlab/CODEOWNERS
+```
+
+Current learning-lab ownership map:
+
+```text
+* @collibra-group
+
+[Application]
+/src/ @collibra-group
+/requirements.txt @collibra-group
+
+[CI/CD]
+/.gitlab-ci.yml @collibra-group
+
+[Documentation]
+/README.md @collibra-group
+/RUNBOOK.md @collibra-group
+/.gitlab/CODEOWNERS @collibra-group
+```
+
+Replace `@collibra-group` with specific GitLab usernames or groups when your
+lab has more people.
+
+Valid owner examples:
+
+```text
+@username
+@group-name
+@group-name/subgroup-name
+```
+
+The owner must have access to the project. Invalid owners do not provide useful
+approval coverage.
+
+### Merge CODEOWNERS First
+
+Recommended order:
+
+1. Add `.gitlab/CODEOWNERS` in an MR.
+2. Merge that MR.
+3. Enable code owner approval on the protected branch.
+4. Test with a separate branch.
+
+This avoids creating a rule that requires code owner approval before the owner
+map exists on `main`.
+
+### Enable Code Owner Approval
+
+In GitLab:
+
+```text
+Settings > Repository > Branch rules > main
+```
+
+Enable:
+
+```text
+Require approval from code owners
+```
+
+Keep:
+
+```text
+Allowed to push and merge: No one
+Allowed to force push: Off
+```
+
+Solo trial note:
+
+If you are the only project member and project settings prevent authors from
+approving their own merge requests, this can intentionally block your test MR.
+That is realistic in a team setting. For solo practice, use warn-mode policies
+or add another eligible reviewer.
+
+### Test Code Owner Approval
+
+After CODEOWNERS is merged and code owner approval is enabled, create a test
+branch:
+
+```bash
+git switch main
+git pull --ff-only origin main
+git switch -c codex/lab-5-codeowners-test
+```
+
+Make a small owned-path change, such as editing `src/training_app.py`:
+
+```python
+@app.route("/health")
+def health():
+    return {"status": "ok"}
+```
+
+Commit and push:
+
+```bash
+git add src/training_app.py
+git commit -m "Test code owner approval"
+git push -u origin codex/lab-5-codeowners-test
+```
+
+Open an MR:
+
+```text
+codex/lab-5-codeowners-test -> main
+```
+
+Expected result:
+
+- GitLab identifies the file as owned by the CODEOWNERS rule.
+- The MR requests approval from the owner.
+- If code owner approval is required, the MR cannot merge until that approval is
+  satisfied.
+
+Close the test MR after observing the behavior, or remove the test route and
+merge only if you want to keep the change.
+
+Cleanup for a closed test MR:
+
+```bash
+git switch main
+git pull --ff-only origin main
+git branch -D codex/lab-5-codeowners-test
+git push origin --delete codex/lab-5-codeowners-test
+git fetch --prune
+```
+
+Lab 5 takeaway:
+
+```text
+CODEOWNERS turns repository structure into review routing.
+```
+
+Security policies answer "is this risky?" Code owners answer "who is accountable
+for reviewing this area?"
+
+## 13. Lab Change Ledger
 
 Use this section when you want to repeat the labs from scratch or explain what
 changed in each lab.
@@ -830,7 +982,87 @@ git fetch --prune
 
 Do not merge the policy test MR. It exists only to prove the policy behavior.
 
-## 13. Repeatability Notes
+### Lab 5: CODEOWNERS
+
+Files changed or created:
+
+```text
+.gitlab/CODEOWNERS
+README.md
+RUNBOOK.md
+```
+
+Purpose:
+
+```text
+Map repository paths to accountable owners and require owner review for protected
+branches.
+```
+
+CODEOWNERS file:
+
+```text
+# GitLab DevSecOps Learning Lab code ownership.
+#
+# Owners must be valid GitLab users or groups with access to this project.
+# Replace @collibra-group with specific users or teams as your lab grows.
+
+* @collibra-group
+
+[Application]
+/src/ @collibra-group
+/requirements.txt @collibra-group
+
+[CI/CD]
+/.gitlab-ci.yml @collibra-group
+
+[Documentation]
+/README.md @collibra-group
+/RUNBOOK.md @collibra-group
+/.gitlab/CODEOWNERS @collibra-group
+```
+
+Commands to add CODEOWNERS:
+
+```bash
+git switch main
+git pull --ff-only origin main
+git switch -c codex/lab-5-codeowners
+git add .gitlab/CODEOWNERS README.md RUNBOOK.md
+git commit -m "Add code owner rules"
+git push -u origin codex/lab-5-codeowners
+```
+
+Expected GitLab result:
+
+```text
+The MR shows CODEOWNERS changes.
+After merge and branch-rule configuration, future owned-path changes require
+code owner approval.
+```
+
+Commands to test code owner approval:
+
+```bash
+git switch main
+git pull --ff-only origin main
+git switch -c codex/lab-5-codeowners-test
+git add src/training_app.py
+git commit -m "Test code owner approval"
+git push -u origin codex/lab-5-codeowners-test
+```
+
+Cleanup after observing the test MR:
+
+```bash
+git switch main
+git pull --ff-only origin main
+git branch -D codex/lab-5-codeowners-test
+git push origin --delete codex/lab-5-codeowners-test
+git fetch --prune
+```
+
+## 14. Repeatability Notes
 
 For every future lab, record:
 
@@ -846,7 +1078,7 @@ Prefer recording lab instructions in this runbook rather than adding historical
 comments inside application source files. Source comments should explain current
 code behavior; the runbook should explain the learning journey.
 
-## 14. Useful Daily Git Commands
+## 15. Useful Daily Git Commands
 
 Check current branch and file state:
 
@@ -890,7 +1122,7 @@ Push a new branch and set upstream:
 git push -u origin BRANCH_NAME
 ```
 
-## 15. What To Remember
+## 16. What To Remember
 
 - A local commit does not run a GitLab pipeline until it is pushed.
 - GitLab creates pipelines from `.gitlab-ci.yml`.
@@ -903,6 +1135,7 @@ git push -u origin BRANCH_NAME
   the security findings are resolved.
 - Remediation is not done when the code is edited. It is done when the next scan
   confirms the finding is gone or intentionally accepted.
+- CODEOWNERS routes reviews based on files and directories.
 - Repeatable labs need a change ledger: files touched, exact snippets, commands,
   expected GitLab result, and cleanup steps.
 - Keep risky training code isolated and clearly marked as intentionally unsafe.

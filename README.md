@@ -59,7 +59,6 @@ pipeline and updates the merge request security report.
 
 The fourth lab moves from scanning to governance:
 
-- Merge the clean security-scanning MR into `main`.
 - Protect `main` so changes flow through merge requests.
 - Add merge request approval expectations.
 - Add a merge request approval policy for high-risk security findings.
@@ -67,3 +66,14 @@ The fourth lab moves from scanning to governance:
 
 This is where DevSecOps shifts from "we can detect risk" to "the platform can
 enforce review before risky changes land."
+
+## Lab 5
+
+The fifth lab adds code ownership:
+
+- Add `.gitlab/CODEOWNERS`.
+- Map application, CI/CD, and documentation files to valid GitLab owners.
+- Enable code owner approval on the protected `main` branch.
+- Test that changing owned files requires the right reviewer.
+
+This is where review becomes tied to file ownership, not just a generic approval.
