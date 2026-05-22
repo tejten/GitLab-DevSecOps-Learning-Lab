@@ -519,23 +519,25 @@ Create:
 Current learning-lab ownership map:
 
 ```text
-* @collibra-group
+* @tejten
 
 [Application]
-/src/ @collibra-group
-/requirements.txt @collibra-group
+/src/ @tejten
+/requirements.txt @tejten
 
 [CI/CD]
-/.gitlab-ci.yml @collibra-group
+/.gitlab-ci.yml @tejten
 
 [Documentation]
-/README.md @collibra-group
-/RUNBOOK.md @collibra-group
-/.gitlab/CODEOWNERS @collibra-group
+/README.md @tejten
+/RUNBOOK.md @tejten
+/.gitlab/CODEOWNERS @tejten
 ```
 
-Replace `@collibra-group` with specific GitLab usernames or groups when your
-lab has more people.
+The first version used `@collibra-group`, but the test MR still showed
+`Approval is optional`. For this solo lab, use your explicit username,
+`@tejten`, so GitLab can resolve an eligible owner. Replace it with reviewer
+groups when your lab has more people.
 
 Valid owner examples:
 
@@ -588,6 +590,19 @@ approving their own merge requests, this can intentionally block your test MR.
 That is realistic in a team setting. For solo practice, use warn-mode policies
 or add another eligible reviewer.
 
+If GitLab shows:
+
+```text
+1 invalid rule has been approved automatically.
+```
+
+then GitLab found an approval rule but could not resolve it into a valid required
+approval for this MR. In this solo lab, the common reason is that `@tejten` is
+both the MR author and the only code owner while project settings prevent author
+approval. The production fix is to add another eligible reviewer or group as a
+code owner. The solo-lab workaround is to temporarily allow author approval or
+invite a second test user.
+
 ### Test Code Owner Approval
 
 After CODEOWNERS is merged and code owner approval is enabled, create a test
@@ -627,6 +642,8 @@ Expected result:
 - The MR requests approval from the owner.
 - If code owner approval is required, the MR cannot merge until that approval is
   satisfied.
+- If GitLab says `1 invalid rule has been approved automatically`, the ownership
+  match exists but there is no eligible approver for the rule.
 
 Close the test MR after observing the behavior, or remove the test route and
 merge only if you want to keep the change.
@@ -1005,21 +1022,21 @@ CODEOWNERS file:
 # GitLab DevSecOps Learning Lab code ownership.
 #
 # Owners must be valid GitLab users or groups with access to this project.
-# Replace @collibra-group with specific users or teams as your lab grows.
+# @tejten is used for the solo lab; replace it with teams as your lab grows.
 
-* @collibra-group
+* @tejten
 
 [Application]
-/src/ @collibra-group
-/requirements.txt @collibra-group
+/src/ @tejten
+/requirements.txt @tejten
 
 [CI/CD]
-/.gitlab-ci.yml @collibra-group
+/.gitlab-ci.yml @tejten
 
 [Documentation]
-/README.md @collibra-group
-/RUNBOOK.md @collibra-group
-/.gitlab/CODEOWNERS @collibra-group
+/README.md @tejten
+/RUNBOOK.md @tejten
+/.gitlab/CODEOWNERS @tejten
 ```
 
 Commands to add CODEOWNERS:
@@ -1136,6 +1153,8 @@ git push -u origin BRANCH_NAME
 - Remediation is not done when the code is edited. It is done when the next scan
   confirms the finding is gone or intentionally accepted.
 - CODEOWNERS routes reviews based on files and directories.
+- Code owner rules need eligible approvers. A rule with only the MR author as
+  owner can become invalid when author self-approval is disabled.
 - Repeatable labs need a change ledger: files touched, exact snippets, commands,
   expected GitLab result, and cleanup steps.
 - Keep risky training code isolated and clearly marked as intentionally unsafe.
