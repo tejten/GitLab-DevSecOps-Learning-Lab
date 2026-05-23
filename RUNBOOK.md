@@ -590,19 +590,6 @@ approving their own merge requests, this can intentionally block your test MR.
 That is realistic in a team setting. For solo practice, use warn-mode policies
 or add another eligible reviewer.
 
-If GitLab shows:
-
-```text
-1 invalid rule has been approved automatically.
-```
-
-then GitLab found an approval rule but could not resolve it into a valid required
-approval for this MR. In this solo lab, the common reason is that `@tejten` is
-both the MR author and the only code owner while project settings prevent author
-approval. The production fix is to add another eligible reviewer or group as a
-code owner. The solo-lab workaround is to temporarily allow author approval or
-invite a second test user.
-
 ### Test Code Owner Approval
 
 After CODEOWNERS is merged and code owner approval is enabled, create a test
@@ -642,8 +629,6 @@ Expected result:
 - The MR requests approval from the owner.
 - If code owner approval is required, the MR cannot merge until that approval is
   satisfied.
-- If GitLab says `1 invalid rule has been approved automatically`, the ownership
-  match exists but there is no eligible approver for the rule.
 
 Close the test MR after observing the behavior, or remove the test route and
 merge only if you want to keep the change.
@@ -667,7 +652,168 @@ CODEOWNERS turns repository structure into review routing.
 Security policies answer "is this risky?" Code owners answer "who is accountable
 for reviewing this area?"
 
-## 13. Lab Change Ledger
+## 13. Lab 6: Container Build And Scanning
+
+Lab 6 scans the deployable artifact: the container image.
+
+Goal:
+
+```text
+Build the app into an image, push it to the GitLab Container Registry, and scan
+that image for vulnerabilities.
+```
+
+### Add Container Files
+
+Create:
+
+```text
+Dockerfile
+.dockerignore
+```
+
+The Dockerfile uses:
+
+- `python:3.12-slim` as the base image.
+- Exact Python dependencies from `requirements.txt`.
+- A non-root `app` user.
+- Flask on port `5000`.
+
+The `.dockerignore` file keeps Git metadata, caches, and local files out of the
+build context.
+
+### Add Container Scanning
+
+Add GitLab's container scanning template:
+
+```yaml
+include:
+  - template: Jobs/Container-Scanning.gitlab-ci.yml
+```
+
+Add a `build` stage between `verify` and `test`:
+
+```yaml
+stages:
+  - verify
+  - build
+  - test
+```
+
+Build and push the image with rootless BuildKit:
+
+```yaml
+build_container_image:
+  stage: build
+  image:
+    name: moby/buildkit:rootless
+    entrypoint: [""]
+  variables:
+    BUILDKITD_FLAGS: --oci-worker-no-process-sandbox
+  before_script:
+    - mkdir -p ~/.docker
+    - 'echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > ~/.docker/config.json'
+  script:
+    - |
+      buildctl-daemonless.sh build \
+        --frontend dockerfile.v0 \
+        --local context=. \
+        --local dockerfile=. \
+        --output type=image,name="$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA",push=true
+```
+
+Point container scanning at that image:
+
+```yaml
+variables:
+  CI_APPLICATION_REPOSITORY: "$CI_REGISTRY_IMAGE"
+  CI_APPLICATION_TAG: "$CI_COMMIT_SHA"
+  CS_DISABLE_LANGUAGE_VULNERABILITY_SCAN: "false"
+
+container_scanning:
+  needs:
+    - build_container_image
+```
+
+`CS_DISABLE_LANGUAGE_VULNERABILITY_SCAN: "false"` asks the scanner to include
+language package vulnerabilities found inside the image, not only operating
+system package vulnerabilities.
+
+### Update CODEOWNERS
+
+Add container files to ownership:
+
+```text
+[Containers]
+/Dockerfile @tejten
+/.dockerignore @tejten
+```
+
+### Run The Lab
+
+Create the branch:
+
+```bash
+git switch main
+git pull --ff-only origin main
+git switch -c codex/lab-6-container-scanning
+```
+
+Commit and push:
+
+```bash
+git add Dockerfile .dockerignore .gitlab-ci.yml .gitlab/CODEOWNERS README.md RUNBOOK.md src/__init__.py
+git commit -m "Add container image scanning lab"
+git push -u origin codex/lab-6-container-scanning
+```
+
+Open an MR:
+
+```text
+codex/lab-6-container-scanning -> main
+```
+
+Expected pipeline jobs:
+
+```text
+hello_pipeline
+build_container_image
+container_scanning
+semgrep-sast
+secret_detection
+gemnasium-python-dependency_scanning
+```
+
+Expected GitLab areas to inspect:
+
+- `Build > Pipelines`
+- `Deploy > Container registry`
+- MR security widget
+- `Secure > Vulnerability report`
+
+### Troubleshooting
+
+If `build_container_image` fails:
+
+- Confirm the project Container Registry is enabled.
+- Confirm GitLab CI variables `CI_REGISTRY`, `CI_REGISTRY_USER`, and
+  `CI_REGISTRY_PASSWORD` are available in the job log.
+- Check whether the runner supports rootless BuildKit.
+
+If `container_scanning` reports no image:
+
+- Confirm `build_container_image` pushed `$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA`.
+- Confirm `CI_APPLICATION_REPOSITORY` is `$CI_REGISTRY_IMAGE`.
+- Confirm `CI_APPLICATION_TAG` is `$CI_COMMIT_SHA`.
+
+Lab 6 takeaway:
+
+```text
+Source scanning catches risky code. Container scanning checks the runtime image
+that would actually be deployed.
+```
+
+## 14. Lab Change Ledger
 
 Use this section when you want to repeat the labs from scratch or explain what
 changed in each lab.
@@ -1079,7 +1225,111 @@ git push origin --delete codex/lab-5-codeowners-test
 git fetch --prune
 ```
 
-## 14. Repeatability Notes
+### Lab 6: Container Build And Scanning
+
+Files changed or created:
+
+```text
+Dockerfile
+.dockerignore
+.gitlab-ci.yml
+.gitlab/CODEOWNERS
+README.md
+RUNBOOK.md
+src/__init__.py
+```
+
+Purpose:
+
+```text
+Build the Flask app as a container image, push it to the GitLab Container
+Registry, and scan the image with GitLab container scanning.
+```
+
+Dockerfile:
+
+```dockerfile
+FROM python:3.12-slim
+
+ENV FLASK_APP=src.training_app \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN addgroup --system app && adduser --system --ingroup app app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY src/ ./src/
+
+USER app
+
+EXPOSE 5000
+
+CMD ["python", "-m", "flask", "run", "--host=0.0.0.0", "--port=5000"]
+```
+
+Container scanning CI additions:
+
+```yaml
+include:
+  - template: Jobs/Container-Scanning.gitlab-ci.yml
+
+variables:
+  CI_APPLICATION_REPOSITORY: "$CI_REGISTRY_IMAGE"
+  CI_APPLICATION_TAG: "$CI_COMMIT_SHA"
+  CS_DISABLE_LANGUAGE_VULNERABILITY_SCAN: "false"
+
+stages:
+  - verify
+  - build
+  - test
+
+build_container_image:
+  stage: build
+  image:
+    name: moby/buildkit:rootless
+    entrypoint: [""]
+  variables:
+    BUILDKITD_FLAGS: --oci-worker-no-process-sandbox
+  before_script:
+    - mkdir -p ~/.docker
+    - 'echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > ~/.docker/config.json'
+  script:
+    - |
+      buildctl-daemonless.sh build \
+        --frontend dockerfile.v0 \
+        --local context=. \
+        --local dockerfile=. \
+        --output type=image,name="$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA",push=true
+
+container_scanning:
+  needs:
+    - build_container_image
+```
+
+Commands:
+
+```bash
+git switch main
+git pull --ff-only origin main
+git switch -c codex/lab-6-container-scanning
+git add Dockerfile .dockerignore .gitlab-ci.yml .gitlab/CODEOWNERS README.md RUNBOOK.md src/__init__.py
+git commit -m "Add container image scanning lab"
+git push -u origin codex/lab-6-container-scanning
+```
+
+Expected GitLab result:
+
+```text
+The pipeline builds and pushes a container image.
+The container_scanning job scans that pushed image.
+The MR security widget reports container image findings, if any.
+```
+
+## 15. Repeatability Notes
 
 For every future lab, record:
 
@@ -1095,7 +1345,7 @@ Prefer recording lab instructions in this runbook rather than adding historical
 comments inside application source files. Source comments should explain current
 code behavior; the runbook should explain the learning journey.
 
-## 15. Useful Daily Git Commands
+## 16. Useful Daily Git Commands
 
 Check current branch and file state:
 
@@ -1139,7 +1389,7 @@ Push a new branch and set upstream:
 git push -u origin BRANCH_NAME
 ```
 
-## 16. What To Remember
+## 17. What To Remember
 
 - A local commit does not run a GitLab pipeline until it is pushed.
 - GitLab creates pipelines from `.gitlab-ci.yml`.
@@ -1153,8 +1403,8 @@ git push -u origin BRANCH_NAME
 - Remediation is not done when the code is edited. It is done when the next scan
   confirms the finding is gone or intentionally accepted.
 - CODEOWNERS routes reviews based on files and directories.
-- Code owner rules need eligible approvers. A rule with only the MR author as
-  owner can become invalid when author self-approval is disabled.
+- Container scanning checks the packaged image, including the base image and
+  installed packages, not just source code.
 - Repeatable labs need a change ledger: files touched, exact snippets, commands,
   expected GitLab result, and cleanup steps.
 - Keep risky training code isolated and clearly marked as intentionally unsafe.

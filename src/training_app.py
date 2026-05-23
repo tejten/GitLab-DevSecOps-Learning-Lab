@@ -33,5 +33,10 @@ def debug():
     return {"debug": False, "status": "ok"}
 
 
+@app.route("/health")
+def health():
+    return {"status": "ok", "owner_check": True}
+
+
 if __name__ == "__main__":
     app.run()

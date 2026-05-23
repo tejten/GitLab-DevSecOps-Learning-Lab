@@ -77,3 +77,15 @@ The fifth lab adds code ownership:
 - Test that changing owned files requires the right reviewer.
 
 This is where review becomes tied to file ownership, not just a generic approval.
+
+## Lab 6
+
+The sixth lab adds container artifact security:
+
+- Add a Dockerfile for the Flask training app.
+- Build and push an image to the GitLab Container Registry.
+- Add GitLab container scanning.
+- Scan the image that would be deployed, not only the source code.
+
+This is where DevSecOps shifts from "is the source safe?" to "is the packaged
+runtime artifact safe?"
