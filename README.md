@@ -101,3 +101,15 @@ The seventh lab remediates container findings:
 
 This is where container security becomes a maintenance loop instead of a
 one-time scan.
+
+## Lab 8
+
+The eighth lab compares an alternate container base image:
+
+- Switch from Debian slim to Alpine.
+- Rebuild and rescan the container image.
+- Compare total findings and severity distribution.
+- Discuss image-size, compatibility, and security tradeoffs.
+
+This is where container hardening becomes evidence-driven rather than assuming
+one base image is always best.

@@ -914,8 +914,12 @@ Compare against Lab 6:
 
 ```text
 Lab 6 baseline: at least 25 container vulnerabilities, 4 high.
-Lab 7 target: fewer findings, fewer high findings, or clear evidence of what remains.
+Lab 7 result: 17 container vulnerabilities, 2 critical, 0 high, and 15 others.
 ```
+
+Lab 7 improved the total count and removed high findings, but two critical
+findings remained. That is a realistic remediation outcome: a change can reduce
+risk without eliminating it.
 
 ### If Findings Remain
 
@@ -936,7 +940,101 @@ Container security is not solved once. Images must be rebuilt, rescanned, and
 maintained as upstream base images and package advisories change.
 ```
 
-## 15. Lab Change Ledger
+## 15. Lab 8: Compare An Alpine Base Image
+
+Lab 8 compares an alternate base image strategy.
+
+Goal:
+
+```text
+Change the base image family, rebuild, rescan, and compare evidence instead of
+assuming a smaller image is automatically safer.
+```
+
+### Strategy
+
+Update the Dockerfile from:
+
+```dockerfile
+FROM python:3.13.13-slim-bookworm
+```
+
+to:
+
+```dockerfile
+FROM python:3.13.13-alpine3.22
+```
+
+Replace Debian package updates:
+
+```dockerfile
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/*
+```
+
+with Alpine package updates:
+
+```dockerfile
+RUN apk upgrade --no-cache
+```
+
+Alpine tradeoff:
+
+```text
+Alpine images are usually smaller and have a different package set, but they use
+musl libc instead of glibc. Some Python packages with native extensions can need
+extra build dependencies or behave differently.
+```
+
+This lab app uses pure Python Flask dependencies, so Alpine is a reasonable
+comparison.
+
+### Run The Lab
+
+Create a branch from Lab 7:
+
+```bash
+git switch codex/lab-7-container-remediation
+git switch -c codex/lab-8-alpine-image
+```
+
+Commit and push:
+
+```bash
+git add Dockerfile README.md RUNBOOK.md
+git commit -m "Compare Alpine container base"
+git push -u origin codex/lab-8-alpine-image
+```
+
+Open an MR:
+
+```text
+codex/lab-8-alpine-image -> main
+```
+
+Expected result:
+
+- The image rebuilds with Alpine.
+- Container scanning reports a different finding set.
+- You compare the result against Lab 7.
+
+Comparison table:
+
+```text
+Lab 6 Debian baseline: at least 25 container vulnerabilities, 4 high.
+Lab 7 updated Debian: 17 container vulnerabilities, 2 critical, 0 high.
+Lab 8 Alpine: record result after scan.
+```
+
+Lab 8 takeaway:
+
+```text
+Base image choice is a risk tradeoff. Compare scan results, compatibility, image
+size, patch cadence, and operational support before standardizing.
+```
+
+## 16. Lab Change Ledger
 
 Use this section when you want to repeat the labs from scratch or explain what
 changed in each lab.
@@ -1504,7 +1602,62 @@ GitLab rebuilds the container image and reruns container_scanning.
 Compare the finding count and severity distribution with Lab 6.
 ```
 
-## 16. Repeatability Notes
+Observed result:
+
+```text
+Lab 6 baseline: at least 25 container vulnerabilities, 4 high.
+Lab 7 result: 17 container vulnerabilities, 2 critical, 0 high, and 15 others.
+```
+
+### Lab 8: Compare Alpine Container Base
+
+Files changed:
+
+```text
+Dockerfile
+README.md
+RUNBOOK.md
+```
+
+Purpose:
+
+```text
+Compare the container scan result from a Debian slim base image with an Alpine
+base image.
+```
+
+Dockerfile changes:
+
+```diff
+- FROM python:3.13.13-slim-bookworm
++ FROM python:3.13.13-alpine3.22
+```
+
+```diff
+- RUN apt-get update \
+-     && apt-get upgrade -y \
+-     && rm -rf /var/lib/apt/lists/*
++ RUN apk upgrade --no-cache
+```
+
+Commands:
+
+```bash
+git switch codex/lab-7-container-remediation
+git switch -c codex/lab-8-alpine-image
+git add Dockerfile README.md RUNBOOK.md
+git commit -m "Compare Alpine container base"
+git push -u origin codex/lab-8-alpine-image
+```
+
+Expected GitLab result:
+
+```text
+GitLab rebuilds the container image and reruns container_scanning.
+Record whether the finding count and severity profile improve or regress.
+```
+
+## 17. Repeatability Notes
 
 For every future lab, record:
 
@@ -1520,7 +1673,7 @@ Prefer recording lab instructions in this runbook rather than adding historical
 comments inside application source files. Source comments should explain current
 code behavior; the runbook should explain the learning journey.
 
-## 17. Useful Daily Git Commands
+## 18. Useful Daily Git Commands
 
 Check current branch and file state:
 
@@ -1564,7 +1717,7 @@ Push a new branch and set upstream:
 git push -u origin BRANCH_NAME
 ```
 
-## 18. What To Remember
+## 19. What To Remember
 
 - A local commit does not run a GitLab pipeline until it is pushed.
 - GitLab creates pipelines from `.gitlab-ci.yml`.
@@ -1582,6 +1735,8 @@ git push -u origin BRANCH_NAME
   installed packages, not just source code.
 - Container remediation is iterative: rebuild from maintained bases, patch
   packages, rescan, and document remaining risk.
+- Smaller base images are not automatically safer. Compare scan findings and
+  runtime compatibility before standardizing.
 - Repeatable labs need a change ledger: files touched, exact snippets, commands,
   expected GitLab result, and cleanup steps.
 - Keep risky training code isolated and clearly marked as intentionally unsafe.

@@ -1,4 +1,4 @@
-FROM python:3.13.13-slim-bookworm
+FROM python:3.13.13-alpine3.22
 
 ENV FLASK_APP=src.training_app \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -6,12 +6,10 @@ ENV FLASK_APP=src.training_app \
 
 WORKDIR /app
 
-RUN addgroup --system app && adduser --system --ingroup app app
+RUN addgroup -S app && adduser -S -G app app
 
 COPY requirements.txt .
-RUN apt-get update \
-    && apt-get upgrade -y \
-    && rm -rf /var/lib/apt/lists/* \
+RUN apk upgrade --no-cache \
     && python -m pip install --no-cache-dir --upgrade \
         pip==26.1.1 \
         setuptools==82.0.1 \
