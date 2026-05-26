@@ -813,7 +813,130 @@ Source scanning catches risky code. Container scanning checks the runtime image
 that would actually be deployed.
 ```
 
-## 14. Lab Change Ledger
+## 14. Lab 7: Container Remediation
+
+Lab 7 reduces container findings from Lab 6.
+
+Goal:
+
+```text
+Treat the container image as a maintained artifact by updating the base image,
+OS packages, and Python packaging tools, then compare scan results.
+```
+
+### What Lab 6 Showed
+
+The Lab 6 MR security report showed:
+
+```text
+Container scanning detected at least 25 new potential vulnerabilities
+0 critical, 4 high, and 21 others
+```
+
+The important lesson:
+
+```text
+Clean source scans do not guarantee a clean runtime image.
+```
+
+Container findings often come from:
+
+- Base image OS packages.
+- Language tooling bundled in the image, such as `pip`.
+- Packages installed transitively by the base image.
+- Images that are not rebuilt after upstream patches are published.
+
+### Remediation Strategy
+
+Update the Dockerfile from:
+
+```dockerfile
+FROM python:3.12-slim
+```
+
+to:
+
+```dockerfile
+FROM python:3.13.13-slim-bookworm
+```
+
+Then update packages during the image build:
+
+```dockerfile
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip install --no-cache-dir --upgrade \
+        pip==26.1.1 \
+        setuptools==82.0.1 \
+        wheel==0.47.0 \
+    && python -m pip install --no-cache-dir -r requirements.txt
+```
+
+The pinned tool versions were checked on May 26, 2026:
+
+```text
+pip==26.1.1
+setuptools==82.0.1
+wheel==0.47.0
+```
+
+### Run The Lab
+
+Create a remediation branch from the Lab 6 branch:
+
+```bash
+git switch codex/lab-6-container-scanning
+git switch -c codex/lab-7-container-remediation
+```
+
+Commit and push:
+
+```bash
+git add Dockerfile README.md RUNBOOK.md
+git commit -m "Remediate container image baseline"
+git push -u origin codex/lab-7-container-remediation
+```
+
+Open an MR:
+
+```text
+codex/lab-7-container-remediation -> main
+```
+
+Expected result:
+
+- The container image is rebuilt.
+- `container_scanning` runs again.
+- The MR security widget shows whether the count changed.
+
+Compare against Lab 6:
+
+```text
+Lab 6 baseline: at least 25 container vulnerabilities, 4 high.
+Lab 7 target: fewer findings, fewer high findings, or clear evidence of what remains.
+```
+
+### If Findings Remain
+
+Remaining findings are normal. Container remediation is iterative.
+
+Next options:
+
+- Wait for patched upstream base images and rebuild.
+- Try a smaller or hardened runtime image.
+- Remove unnecessary runtime packages.
+- Add an allowlist only with a documented risk acceptance reason.
+- Use a stricter deployment policy for critical/high container findings.
+
+Lab 7 takeaway:
+
+```text
+Container security is not solved once. Images must be rebuilt, rescanned, and
+maintained as upstream base images and package advisories change.
+```
+
+## 15. Lab Change Ledger
 
 Use this section when you want to repeat the labs from scratch or explain what
 changed in each lab.
@@ -1329,7 +1452,59 @@ The container_scanning job scans that pushed image.
 The MR security widget reports container image findings, if any.
 ```
 
-## 15. Repeatability Notes
+### Lab 7: Container Remediation
+
+Files changed:
+
+```text
+Dockerfile
+README.md
+RUNBOOK.md
+```
+
+Purpose:
+
+```text
+Reduce container findings by updating the base image, applying OS package
+updates, and pinning current Python packaging tools inside the image.
+```
+
+Dockerfile changes:
+
+```diff
+- FROM python:3.12-slim
++ FROM python:3.13.13-slim-bookworm
+```
+
+```dockerfile
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip install --no-cache-dir --upgrade \
+        pip==26.1.1 \
+        setuptools==82.0.1 \
+        wheel==0.47.0 \
+    && python -m pip install --no-cache-dir -r requirements.txt
+```
+
+Commands:
+
+```bash
+git switch codex/lab-6-container-scanning
+git switch -c codex/lab-7-container-remediation
+git add Dockerfile README.md RUNBOOK.md
+git commit -m "Remediate container image baseline"
+git push -u origin codex/lab-7-container-remediation
+```
+
+Expected GitLab result:
+
+```text
+GitLab rebuilds the container image and reruns container_scanning.
+Compare the finding count and severity distribution with Lab 6.
+```
+
+## 16. Repeatability Notes
 
 For every future lab, record:
 
@@ -1345,7 +1520,7 @@ Prefer recording lab instructions in this runbook rather than adding historical
 comments inside application source files. Source comments should explain current
 code behavior; the runbook should explain the learning journey.
 
-## 16. Useful Daily Git Commands
+## 17. Useful Daily Git Commands
 
 Check current branch and file state:
 
@@ -1389,7 +1564,7 @@ Push a new branch and set upstream:
 git push -u origin BRANCH_NAME
 ```
 
-## 17. What To Remember
+## 18. What To Remember
 
 - A local commit does not run a GitLab pipeline until it is pushed.
 - GitLab creates pipelines from `.gitlab-ci.yml`.
@@ -1405,6 +1580,8 @@ git push -u origin BRANCH_NAME
 - CODEOWNERS routes reviews based on files and directories.
 - Container scanning checks the packaged image, including the base image and
   installed packages, not just source code.
+- Container remediation is iterative: rebuild from maintained bases, patch
+  packages, rescan, and document remaining risk.
 - Repeatable labs need a change ledger: files touched, exact snippets, commands,
   expected GitLab result, and cleanup steps.
 - Keep risky training code isolated and clearly marked as intentionally unsafe.

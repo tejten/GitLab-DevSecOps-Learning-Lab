@@ -89,3 +89,15 @@ The sixth lab adds container artifact security:
 
 This is where DevSecOps shifts from "is the source safe?" to "is the packaged
 runtime artifact safe?"
+
+## Lab 7
+
+The seventh lab remediates container findings:
+
+- Move the image to a current Python slim Bookworm tag.
+- Apply available Debian package updates during the image build.
+- Upgrade Python packaging tools that scanners often flag inside images.
+- Re-run container scanning and compare findings against Lab 6.
+
+This is where container security becomes a maintenance loop instead of a
+one-time scan.
