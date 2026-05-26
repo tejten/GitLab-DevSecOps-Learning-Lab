@@ -1176,7 +1176,135 @@ source, dependency, and container scanning because runtime behavior can reveal
 issues that static analysis cannot.
 ```
 
-## 17. Lab Change Ledger
+## 17. Lab 10: Remediate DAST Security Headers
+
+Lab 10 fixes the first DAST findings from Lab 9.
+
+Goal:
+
+```text
+Add browser-facing security headers to every response, reduce avoidable server
+metadata, and rerun DAST to confirm the live HTTP surface improved.
+```
+
+### What The Lab 9 Findings Mean
+
+DAST found:
+
+- `Missing X-Content-Type-Options: nosniff`
+- `Server header exposes version information`
+- `Content-Security-Policy analysis`
+
+These are runtime HTTP findings. They are visible in live responses, which is
+why SAST, dependency scanning, and container scanning did not report them.
+
+### Add Response Security Headers
+
+In `src/training_app.py`, add a shared header map:
+
+```python
+SECURITY_HEADERS = {
+    "Content-Security-Policy": (
+        "default-src 'none'; "
+        "base-uri 'none'; "
+        "frame-ancestors 'none'; "
+        "form-action 'none'"
+    ),
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Permissions-Policy": "camera=(), geolocation=(), microphone=()",
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+}
+```
+
+Apply those headers to every Flask response:
+
+```python
+@app.after_request
+def add_security_headers(response):
+    response.headers.update(SECURITY_HEADERS)
+    return response
+```
+
+For this training app, also prevent the Flask/Werkzeug development server from
+advertising its exact Werkzeug and Python versions:
+
+```python
+WSGIRequestHandler.server_version = "training-app"
+WSGIRequestHandler.sys_version = ""
+```
+
+In a production system, this part usually belongs in the real app server,
+ingress controller, load balancer, or reverse proxy configuration.
+
+### Run The Lab
+
+Create a branch from Lab 9:
+
+```bash
+git switch codex/lab-9-dast
+git switch -c codex/lab-10-dast-remediation
+```
+
+Commit and push:
+
+```bash
+git add src/training_app.py README.md RUNBOOK.md
+git commit -m "Remediate DAST security headers"
+git push -u origin codex/lab-10-dast-remediation
+```
+
+Open an MR:
+
+```text
+codex/lab-10-dast-remediation -> main
+```
+
+Expected result:
+
+- SAST remains clean.
+- Dependency scanning remains clean.
+- Container scanning remains clean.
+- DAST should no longer report missing `X-Content-Type-Options`.
+- DAST should no longer see Werkzeug/Python version details in the `Server`
+  header.
+- CSP analysis should improve, or become an accepted informational note
+  depending on GitLab's DAST rule behavior.
+
+### Local Header Check
+
+Start the app locally:
+
+```bash
+python3 -m flask --app src.training_app run --host 127.0.0.1 --port 5001
+```
+
+In another terminal, inspect the headers:
+
+```bash
+curl -s -D - http://127.0.0.1:5001/health -o /tmp/lab10-health.out
+```
+
+Expected headers include:
+
+```text
+Server: training-app
+Content-Security-Policy: default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Permissions-Policy: camera=(), geolocation=(), microphone=()
+```
+
+Lab 10 takeaway:
+
+```text
+DAST findings become most useful when they create a remediation loop: scan the
+running app, change runtime behavior, rescan, and record what improved.
+```
+
+## 18. Lab Change Ledger
 
 Use this section when you want to repeat the labs from scratch or explain what
 changed in each lab.
@@ -1892,7 +2020,80 @@ Add security headers to the Flask app, reduce avoidable response metadata, and
 rerun DAST to confirm the findings are resolved or intentionally accepted.
 ```
 
-## 18. Repeatability Notes
+### Lab 10: Remediate DAST Security Headers
+
+Files changed:
+
+```text
+src/training_app.py
+README.md
+RUNBOOK.md
+```
+
+Purpose:
+
+```text
+Fix the first runtime HTTP findings produced by DAST.
+```
+
+Application changes:
+
+```python
+SECURITY_HEADERS = {
+    "Content-Security-Policy": (
+        "default-src 'none'; "
+        "base-uri 'none'; "
+        "frame-ancestors 'none'; "
+        "form-action 'none'"
+    ),
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Permissions-Policy": "camera=(), geolocation=(), microphone=()",
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+}
+
+WSGIRequestHandler.server_version = "training-app"
+WSGIRequestHandler.sys_version = ""
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers.update(SECURITY_HEADERS)
+    return response
+```
+
+Commands:
+
+```bash
+git switch codex/lab-9-dast
+git switch -c codex/lab-10-dast-remediation
+git add src/training_app.py README.md RUNBOOK.md
+git commit -m "Remediate DAST security headers"
+git push -u origin codex/lab-10-dast-remediation
+```
+
+Local verification:
+
+```bash
+python3 -m flask --app src.training_app run --host 127.0.0.1 --port 5001
+curl -s -D - http://127.0.0.1:5001/health -o /tmp/lab10-health.out
+```
+
+Expected GitLab result:
+
+```text
+DAST should show the missing nosniff header and server version disclosure as
+fixed or absent in the new MR security report.
+```
+
+Observed result:
+
+```text
+Record the MR security report after the pipeline finishes.
+```
+
+## 19. Repeatability Notes
 
 For every future lab, record:
 
@@ -1908,7 +2109,7 @@ Prefer recording lab instructions in this runbook rather than adding historical
 comments inside application source files. Source comments should explain current
 code behavior; the runbook should explain the learning journey.
 
-## 19. Useful Daily Git Commands
+## 20. Useful Daily Git Commands
 
 Check current branch and file state:
 
@@ -1952,7 +2153,7 @@ Push a new branch and set upstream:
 git push -u origin BRANCH_NAME
 ```
 
-## 20. What To Remember
+## 21. What To Remember
 
 - A local commit does not run a GitLab pipeline until it is pushed.
 - GitLab creates pipelines from `.gitlab-ci.yml`.
@@ -1976,6 +2177,10 @@ git push -u origin BRANCH_NAME
 - A CI service alias is a pipeline hostname, not a project folder.
 - Passive DAST is a safer first step; active scans are more aggressive and
   should target test environments.
+- HTTP security headers are runtime behavior. They are usually verified by DAST
+  or HTTP integration tests, not by dependency scanners.
+- Do not rely on the Flask development server for production. In real systems,
+  app server and reverse proxy headers need their own hardening.
 - Repeatable labs need a change ledger: files touched, exact snippets, commands,
   expected GitLab result, and cleanup steps.
 - Keep risky training code isolated and clearly marked as intentionally unsafe.

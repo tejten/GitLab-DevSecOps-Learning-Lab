@@ -125,3 +125,15 @@ The ninth lab adds dynamic application security testing:
 
 This is where DevSecOps shifts from "does the code look risky?" to "does the
 running application expose risky behavior?"
+
+## Lab 10
+
+The tenth lab remediates the first DAST findings:
+
+- Add browser-facing security headers to every Flask response.
+- Add a restrictive Content Security Policy for the JSON training API.
+- Stop the lab server from advertising Werkzeug and Python version details.
+- Rerun DAST and compare the new report against Lab 9.
+
+This is where DAST becomes a feedback loop: scan the live app, harden the
+runtime behavior, and scan again to confirm the result.
