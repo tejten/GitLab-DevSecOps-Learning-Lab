@@ -2090,7 +2090,17 @@ fixed or absent in the new MR security report.
 Observed result:
 
 ```text
-Record the MR security report after the pipeline finishes.
+GitLab reported no new potential security vulnerabilities.
+
+DAST detected no new potential vulnerabilities and marked the Lab 9 findings as
+fixed:
+
+- Low: Missing X-Content-Type-Options: nosniff
+- Low: Server header exposes version information
+- Info: Content-Security-Policy analysis
+
+SAST, dependency scanning, container scanning, and secret detection also reported
+no new potential vulnerabilities.
 ```
 
 ## 19. Repeatability Notes
