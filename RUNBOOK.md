@@ -1867,7 +1867,29 @@ against http://app:5000, and publishes DAST results in the security report.
 Observed result:
 
 ```text
-Record the MR security report after the pipeline finishes.
+DAST reached the running Flask app and detected 3 new potential vulnerabilities:
+
+- Low: Missing X-Content-Type-Options: nosniff
+- Low: Server header exposes version information
+- Info: Content-Security-Policy analysis
+
+SAST, dependency scanning, container scanning, and secret detection reported no
+new potential vulnerabilities in the same MR.
+```
+
+Interpretation:
+
+```text
+This is a successful DAST lab. The scanner tested the live HTTP response and
+found missing or noisy browser-facing security headers. These are runtime/web
+configuration issues, not source-code vulnerabilities.
+```
+
+Natural next remediation lab:
+
+```text
+Add security headers to the Flask app, reduce avoidable response metadata, and
+rerun DAST to confirm the findings are resolved or intentionally accepted.
 ```
 
 ## 18. Repeatability Notes
