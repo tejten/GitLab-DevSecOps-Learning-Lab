@@ -1024,8 +1024,13 @@ Comparison table:
 ```text
 Lab 6 Debian baseline: at least 25 container vulnerabilities, 4 high.
 Lab 7 updated Debian: 17 container vulnerabilities, 2 critical, 0 high.
-Lab 8 Alpine: record result after scan.
+Lab 8 Alpine: 0 new container vulnerabilities.
 ```
+
+GitLab listed the Debian-image findings from Lab 6 and Lab 7 as fixed after the
+Alpine image scan. This does not mean Alpine is always better. It means this app
+and dependency set produced a cleaner scan with the Alpine base at the time of
+the lab.
 
 Lab 8 takeaway:
 
@@ -1655,6 +1660,13 @@ Expected GitLab result:
 ```text
 GitLab rebuilds the container image and reruns container_scanning.
 Record whether the finding count and severity profile improve or regress.
+```
+
+Observed result:
+
+```text
+Container scanning detected no new potential vulnerabilities.
+Previously reported Debian-image findings were shown as fixed.
 ```
 
 ## 17. Repeatability Notes
