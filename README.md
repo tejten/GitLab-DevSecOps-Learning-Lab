@@ -113,3 +113,15 @@ The eighth lab compares an alternate container base image:
 
 This is where container hardening becomes evidence-driven rather than assuming
 one base image is always best.
+
+## Lab 9
+
+The ninth lab adds dynamic application security testing:
+
+- Start the built container image as a service inside the pipeline.
+- Point GitLab DAST at the running Flask app.
+- Scan the live HTTP surface instead of only source code or packaged artifacts.
+- Review DAST findings in the merge request security report.
+
+This is where DevSecOps shifts from "does the code look risky?" to "does the
+running application expose risky behavior?"

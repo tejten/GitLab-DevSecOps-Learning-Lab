@@ -1039,7 +1039,144 @@ Base image choice is a risk tradeoff. Compare scan results, compatibility, image
 size, patch cadence, and operational support before standardizing.
 ```
 
-## 16. Lab Change Ledger
+## 16. Lab 9: Dynamic Application Security Testing
+
+Lab 9 adds DAST: Dynamic Application Security Testing.
+
+Goal:
+
+```text
+Run the application in CI and scan the live HTTP surface from the outside, the
+way a browser or attacker would interact with it.
+```
+
+### What DAST Adds
+
+The earlier labs scan different layers:
+
+- SAST scans source code.
+- Secret detection scans committed content.
+- Dependency scanning scans package manifests.
+- Container scanning scans the built image.
+
+DAST scans a running web application. For this lab, the pipeline builds the
+Flask container image, starts that image as a CI service named `app`, and points
+the GitLab DAST analyzer at:
+
+```text
+http://app:5000
+```
+
+### Add DAST To CI
+
+Add the GitLab DAST template:
+
+```yaml
+include:
+  - template: Security/DAST.gitlab-ci.yml
+```
+
+Add a DAST stage:
+
+```yaml
+stages:
+  - verify
+  - build
+  - test
+  - dast
+```
+
+Configure the `dast` job to wait for the image build, run the built image as a
+service, and scan the service URL:
+
+```yaml
+dast:
+  needs:
+    - build_container_image
+  services:
+    - name: "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA"
+      alias: app
+  variables:
+    DAST_TARGET_URL: "http://app:5000"
+    DAST_FULL_SCAN: "false"
+    DAST_TARGET_CHECK_TIMEOUT: "120"
+```
+
+Important details:
+
+- `build_container_image` creates and pushes the container image.
+- The `services` block starts that image next to the DAST analyzer job.
+- The service alias `app` becomes the hostname inside the CI network.
+- `DAST_TARGET_URL` tells DAST which running app to scan.
+- `DAST_FULL_SCAN: "false"` keeps this first lab passive and faster.
+
+### Run The Lab
+
+Create a branch from Lab 8:
+
+```bash
+git switch codex/lab-8-alpine-image
+git switch -c codex/lab-9-dast
+```
+
+Commit and push:
+
+```bash
+git add .gitlab-ci.yml README.md RUNBOOK.md
+git commit -m "Add DAST lab"
+git push -u origin codex/lab-9-dast
+```
+
+Open an MR:
+
+```text
+codex/lab-9-dast -> main
+```
+
+Expected result:
+
+- `build_container_image` builds and pushes the app image.
+- `dast` starts the app image as a service.
+- DAST scans `http://app:5000`.
+- Results appear in the pipeline security report and MR Reports tab.
+
+### Troubleshooting
+
+If the pipeline says the DAST template cannot be found, replace:
+
+```yaml
+- template: Security/DAST.gitlab-ci.yml
+```
+
+with:
+
+```yaml
+- template: DAST.gitlab-ci.yml
+```
+
+GitLab has used both forms across documentation and template examples.
+
+If DAST cannot connect to the target:
+
+- Confirm the Dockerfile runs Flask on `--host=0.0.0.0`.
+- Confirm the service alias is `app`.
+- Confirm `DAST_TARGET_URL` is `http://app:5000`.
+- Confirm `build_container_image` completed successfully before `dast`.
+- Increase `DAST_TARGET_CHECK_TIMEOUT` if the app starts slowly.
+
+If DAST finds no vulnerabilities, that is not a failure. This lab is about
+proving that GitLab can scan a running app. Future labs can add authentication,
+active scans, review apps, or intentionally vulnerable routes.
+
+Lab 9 takeaway:
+
+```text
+DAST validates the deployed behavior of a web application. It complements
+source, dependency, and container scanning because runtime behavior can reveal
+issues that static analysis cannot.
+```
+
+## 17. Lab Change Ledger
 
 Use this section when you want to repeat the labs from scratch or explain what
 changed in each lab.
@@ -1669,7 +1806,71 @@ Container scanning detected no new potential vulnerabilities.
 Previously reported Debian-image findings were shown as fixed.
 ```
 
-## 17. Repeatability Notes
+### Lab 9: Dynamic Application Security Testing
+
+Files changed:
+
+```text
+.gitlab-ci.yml
+README.md
+RUNBOOK.md
+```
+
+Purpose:
+
+```text
+Run the Flask app as a CI service and scan the live HTTP surface with GitLab
+DAST.
+```
+
+CI additions:
+
+```yaml
+include:
+  - template: Security/DAST.gitlab-ci.yml
+
+stages:
+  - verify
+  - build
+  - test
+  - dast
+
+dast:
+  needs:
+    - build_container_image
+  services:
+    - name: "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHA"
+      alias: app
+  variables:
+    DAST_TARGET_URL: "http://app:5000"
+    DAST_FULL_SCAN: "false"
+    DAST_TARGET_CHECK_TIMEOUT: "120"
+```
+
+Commands:
+
+```bash
+git switch codex/lab-8-alpine-image
+git switch -c codex/lab-9-dast
+git add .gitlab-ci.yml README.md RUNBOOK.md
+git commit -m "Add DAST lab"
+git push -u origin codex/lab-9-dast
+```
+
+Expected GitLab result:
+
+```text
+The pipeline builds the app image, starts it as the app service, runs DAST
+against http://app:5000, and publishes DAST results in the security report.
+```
+
+Observed result:
+
+```text
+Record the MR security report after the pipeline finishes.
+```
+
+## 18. Repeatability Notes
 
 For every future lab, record:
 
@@ -1685,7 +1886,7 @@ Prefer recording lab instructions in this runbook rather than adding historical
 comments inside application source files. Source comments should explain current
 code behavior; the runbook should explain the learning journey.
 
-## 18. Useful Daily Git Commands
+## 19. Useful Daily Git Commands
 
 Check current branch and file state:
 
@@ -1729,7 +1930,7 @@ Push a new branch and set upstream:
 git push -u origin BRANCH_NAME
 ```
 
-## 19. What To Remember
+## 20. What To Remember
 
 - A local commit does not run a GitLab pipeline until it is pushed.
 - GitLab creates pipelines from `.gitlab-ci.yml`.
@@ -1749,6 +1950,10 @@ git push -u origin BRANCH_NAME
   packages, rescan, and document remaining risk.
 - Smaller base images are not automatically safer. Compare scan findings and
   runtime compatibility before standardizing.
+- DAST scans the running app over HTTP, so it needs a reachable target URL.
+- A CI service alias is a pipeline hostname, not a project folder.
+- Passive DAST is a safer first step; active scans are more aggressive and
+  should target test environments.
 - Repeatable labs need a change ledger: files touched, exact snippets, commands,
   expected GitLab result, and cleanup steps.
 - Keep risky training code isolated and clearly marked as intentionally unsafe.
