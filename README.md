@@ -137,3 +137,16 @@ The tenth lab remediates the first DAST findings:
 
 This is where DAST becomes a feedback loop: scan the live app, harden the
 runtime behavior, and scan again to confirm the result.
+
+## Lab 11
+
+The eleventh lab adds software supply-chain evidence:
+
+- Generate a CycloneDX SBOM from the pinned Python dependencies and Docker base.
+- Publish the SBOM as a GitLab CycloneDX report artifact.
+- Publish a build provenance artifact that ties the SBOM to the commit,
+  pipeline, branch, and container image tag.
+- Inspect the downloadable artifacts from the pipeline.
+
+This is where DevSecOps shifts from "the pipeline passed" to "we can prove what
+was in the build."

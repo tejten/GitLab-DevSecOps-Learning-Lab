@@ -1,0 +1,13 @@
+{
+  "generated_at": "2026-05-27T19:54:10.724952+00:00",
+  "project": "Learn Gitlab",
+  "project_url": "",
+  "branch": "local",
+  "commit_sha": "local",
+  "pipeline_id": "local",
+  "container_image": {
+    "repository": "",
+    "tag": "local"
+  },
+  "sbom": "evidence/training-sbom.cdx.json"
+}

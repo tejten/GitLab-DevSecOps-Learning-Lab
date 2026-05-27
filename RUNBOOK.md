@@ -1304,7 +1304,161 @@ DAST findings become most useful when they create a remediation loop: scan the
 running app, change runtime behavior, rescan, and record what improved.
 ```
 
-## 18. Lab Change Ledger
+## 18. Lab 11: SBOM And Build Evidence Artifacts
+
+Lab 11 adds supply-chain evidence artifacts.
+
+Goal:
+
+```text
+Generate a CycloneDX SBOM and a small provenance file so every pipeline can
+answer: what did we build, from which commit, with which dependencies, and where
+is the resulting container image?
+```
+
+### Why This Matters
+
+Security scanners tell you whether known risks were detected. SBOM and
+provenance artifacts help answer a different audit question:
+
+```text
+What exactly was inside this build, and which pipeline produced it?
+```
+
+For this training repo, the SBOM records:
+
+- Pinned Python dependencies from `requirements.txt`.
+- The Docker base image from `Dockerfile`.
+- The project and commit that produced the SBOM.
+
+The provenance file records:
+
+- Project path.
+- Branch.
+- Commit SHA.
+- Pipeline ID.
+- Container image repository and tag.
+
+### Add The SBOM Generator
+
+Add `scripts/generate_sbom.py`.
+
+The script:
+
+- Reads pinned dependencies from `requirements.txt`.
+- Reads the `FROM` image from `Dockerfile`.
+- Writes `evidence/training-sbom.cdx.json`.
+- Writes `evidence/build-provenance.json`.
+
+The generated files are ignored locally because CI publishes them as artifacts:
+
+```gitignore
+/evidence/
+```
+
+### Publish Artifacts In GitLab CI
+
+Add an `evidence` stage:
+
+```yaml
+stages:
+  - verify
+  - evidence
+  - build
+  - test
+  - dast
+```
+
+Add the SBOM job:
+
+```yaml
+generate_sbom:
+  stage: evidence
+  image: python:3.13-alpine
+  script:
+    - python scripts/generate_sbom.py
+    - python -m json.tool evidence/training-sbom.cdx.json > /tmp/training-sbom.validated.json
+    - python -m json.tool evidence/build-provenance.json > /tmp/build-provenance.validated.json
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - evidence/training-sbom.cdx.json
+      - evidence/build-provenance.json
+    reports:
+      cyclonedx:
+        - evidence/training-sbom.cdx.json
+```
+
+Important details:
+
+- `paths` makes both files downloadable from the job.
+- `reports: cyclonedx` tells GitLab this artifact is an SBOM report.
+- The validation commands fail the job if either JSON file is malformed.
+
+### Run The Lab
+
+Create a branch from Lab 10:
+
+```bash
+git switch codex/lab-10-dast-remediation
+git switch -c codex/lab-11-sbom-artifacts
+```
+
+Commit and push:
+
+```bash
+git add .gitignore .gitlab-ci.yml scripts/generate_sbom.py README.md RUNBOOK.md
+git commit -m "Add SBOM evidence artifacts"
+git push -u origin codex/lab-11-sbom-artifacts
+```
+
+Open an MR:
+
+```text
+codex/lab-11-sbom-artifacts -> main
+```
+
+Expected result:
+
+- The `generate_sbom` job runs in the `evidence` stage.
+- The job publishes `training-sbom.cdx.json`.
+- The job publishes `build-provenance.json`.
+- GitLab accepts the CycloneDX report artifact.
+
+### Inspect The Artifacts
+
+Open:
+
+```text
+Build > Pipelines > latest pipeline > generate_sbom
+```
+
+Then use the artifact download button to inspect:
+
+```text
+evidence/training-sbom.cdx.json
+evidence/build-provenance.json
+```
+
+The SBOM should include:
+
+```text
+Flask
+Jinja2
+Werkzeug
+python:3.13.13-alpine3.22
+```
+
+Lab 11 takeaway:
+
+```text
+DevSecOps is not only about blocking bad changes. It is also about producing
+evidence that lets you explain what was built, where it came from, and what it
+contained.
+```
+
+## 19. Lab Change Ledger
 
 Use this section when you want to repeat the labs from scratch or explain what
 changed in each lab.
@@ -2103,7 +2257,84 @@ SAST, dependency scanning, container scanning, and secret detection also reporte
 no new potential vulnerabilities.
 ```
 
-## 19. Repeatability Notes
+### Lab 11: SBOM And Build Evidence Artifacts
+
+Files changed:
+
+```text
+.gitignore
+.gitlab-ci.yml
+scripts/generate_sbom.py
+README.md
+RUNBOOK.md
+```
+
+Purpose:
+
+```text
+Generate and publish supply-chain evidence artifacts from the pipeline.
+```
+
+CI additions:
+
+```yaml
+stages:
+  - verify
+  - evidence
+  - build
+  - test
+  - dast
+
+generate_sbom:
+  stage: evidence
+  image: python:3.13-alpine
+  script:
+    - python scripts/generate_sbom.py
+    - python -m json.tool evidence/training-sbom.cdx.json > /tmp/training-sbom.validated.json
+    - python -m json.tool evidence/build-provenance.json > /tmp/build-provenance.validated.json
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - evidence/training-sbom.cdx.json
+      - evidence/build-provenance.json
+    reports:
+      cyclonedx:
+        - evidence/training-sbom.cdx.json
+```
+
+Commands:
+
+```bash
+git switch codex/lab-10-dast-remediation
+git switch -c codex/lab-11-sbom-artifacts
+git add .gitignore .gitlab-ci.yml scripts/generate_sbom.py README.md RUNBOOK.md
+git commit -m "Add SBOM evidence artifacts"
+git push -u origin codex/lab-11-sbom-artifacts
+```
+
+Local verification:
+
+```bash
+python3 scripts/generate_sbom.py
+python3 -m json.tool evidence/training-sbom.cdx.json
+python3 -m json.tool evidence/build-provenance.json
+```
+
+Expected GitLab result:
+
+```text
+The generate_sbom job publishes downloadable SBOM and provenance artifacts, and
+GitLab ingests the CycloneDX SBOM report.
+```
+
+Observed result:
+
+```text
+Record the pipeline artifact result after the pipeline finishes.
+```
+
+## 20. Repeatability Notes
 
 For every future lab, record:
 
@@ -2119,7 +2350,7 @@ Prefer recording lab instructions in this runbook rather than adding historical
 comments inside application source files. Source comments should explain current
 code behavior; the runbook should explain the learning journey.
 
-## 20. Useful Daily Git Commands
+## 21. Useful Daily Git Commands
 
 Check current branch and file state:
 
@@ -2163,7 +2394,7 @@ Push a new branch and set upstream:
 git push -u origin BRANCH_NAME
 ```
 
-## 21. What To Remember
+## 22. What To Remember
 
 - A local commit does not run a GitLab pipeline until it is pushed.
 - GitLab creates pipelines from `.gitlab-ci.yml`.
@@ -2191,6 +2422,11 @@ git push -u origin BRANCH_NAME
   or HTTP integration tests, not by dependency scanners.
 - Do not rely on the Flask development server for production. In real systems,
   app server and reverse proxy headers need their own hardening.
+- An SBOM is an inventory of components. It helps audit what was present in a
+  build, but it does not prove by itself that the build is secure.
+- Provenance ties evidence to a source revision and pipeline run.
+- GitLab job artifacts are part of the audit trail. Download and inspect them
+  when learning a new scanner or report type.
 - Repeatable labs need a change ledger: files touched, exact snippets, commands,
   expected GitLab result, and cleanup steps.
 - Keep risky training code isolated and clearly marked as intentionally unsafe.
