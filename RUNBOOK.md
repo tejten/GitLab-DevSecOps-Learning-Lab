@@ -2331,7 +2331,26 @@ GitLab ingests the CycloneDX SBOM report.
 Observed result:
 
 ```text
-Record the pipeline artifact result after the pipeline finishes.
+Pipeline #2557129666 passed with 8 jobs.
+
+The generate_sbom job completed successfully in the evidence stage and published
+downloadable artifacts.
+
+Downloaded artifacts included:
+
+- evidence/training-sbom.cdx.json
+- evidence/build-provenance.json
+
+The provenance artifact recorded the project URL, branch, commit SHA, pipeline
+ID, container image repository, and image tag.
+
+The SBOM artifact recorded the application component, Python dependencies, and
+Docker base image:
+
+- Flask 3.1.3
+- Jinja2 3.1.6
+- Werkzeug 3.1.8
+- python:3.13.13-alpine3.22
 ```
 
 ## 20. Repeatability Notes
