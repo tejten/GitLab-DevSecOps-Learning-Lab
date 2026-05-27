@@ -1,0 +1,17 @@
+{
+  "generated_at": "2026-05-27T20:47:57.248802+00:00",
+  "project": "Learn Gitlab",
+  "project_url": "",
+  "branch": "local",
+  "commit_sha": "local",
+  "pipeline_id": "local",
+  "job_id": "local",
+  "environment_name": "review/local",
+  "environment_slug": "review-local",
+  "environment_url": "",
+  "container_image": {
+    "repository": "",
+    "tag": "local"
+  },
+  "deployment_type": "simulated-review-environment"
+}

@@ -150,3 +150,15 @@ The eleventh lab adds software supply-chain evidence:
 
 This is where DevSecOps shifts from "the pipeline passed" to "we can prove what
 was in the build."
+
+## Lab 12
+
+The twelfth lab adds deployment visibility:
+
+- Create a GitLab review environment for non-default branches.
+- Publish a review deployment HTML and JSON evidence artifact.
+- Link the environment URL to the deployment artifact.
+- Add a manual stop job to practice the environment lifecycle.
+
+This is where DevSecOps shifts from "the build exists" to "GitLab can track
+where a change was reviewed, when it was deployed, and how to stop it."

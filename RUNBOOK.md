@@ -1458,7 +1458,180 @@ evidence that lets you explain what was built, where it came from, and what it
 contained.
 ```
 
-## 19. Lab Change Ledger
+## 19. Lab 12: Review Environments And Deployment Records
+
+Lab 12 adds GitLab environment tracking.
+
+Goal:
+
+```text
+Create a review environment for a branch, attach a deployment evidence artifact,
+and practice stopping the environment from GitLab.
+```
+
+### Why This Matters
+
+Pipelines prove automation ran. Environments show where a change is deployed or
+reviewed. This matters when teams need to answer:
+
+- Which commit is currently in a review environment?
+- Which pipeline created the deployment?
+- Where can a reviewer inspect the deployed result?
+- Has the temporary environment been stopped?
+
+This lab uses a simulated review environment. It does not deploy to a cloud
+provider yet. Instead, it creates a GitLab environment record whose URL points to
+a generated HTML artifact.
+
+### Add The Deployment Record Generator
+
+Add `scripts/generate_review_deployment.py`.
+
+The script writes:
+
+```text
+evidence/review-deployment.html
+evidence/review-deployment.json
+```
+
+The JSON record includes:
+
+- Project path.
+- Branch.
+- Commit SHA.
+- Pipeline ID.
+- Job ID.
+- Environment name.
+- Environment URL.
+- Container image repository and tag.
+
+### Add A Deploy Stage
+
+Add a `deploy` stage after DAST:
+
+```yaml
+stages:
+  - verify
+  - evidence
+  - build
+  - test
+  - dast
+  - deploy
+```
+
+Add the review environment deployment job:
+
+```yaml
+deploy_review:
+  stage: deploy
+  image: python:3.13-alpine
+  resource_group: review/$CI_COMMIT_REF_SLUG
+  rules:
+    - if: '$CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
+  script:
+    - python scripts/generate_review_deployment.py
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - evidence/review-deployment.html
+      - evidence/review-deployment.json
+  environment:
+    name: review/$CI_COMMIT_REF_SLUG
+    url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/evidence/review-deployment.html"
+    on_stop: stop_review
+    auto_stop_in: 1 day
+```
+
+Add the manual stop job:
+
+```yaml
+stop_review:
+  stage: deploy
+  image: alpine:3.20
+  resource_group: review/$CI_COMMIT_REF_SLUG
+  variables:
+    GIT_STRATEGY: none
+  rules:
+    - if: '$CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
+      when: manual
+      allow_failure: true
+  script:
+    - 'echo "Stopping review environment: $CI_ENVIRONMENT_NAME"'
+  environment:
+    name: review/$CI_COMMIT_REF_SLUG
+    action: stop
+```
+
+Important details:
+
+- `environment:name` creates the GitLab environment record.
+- `environment:url` gives reviewers a clickable target.
+- `on_stop` connects the environment to the manual stop job.
+- `auto_stop_in` tells GitLab this temporary environment should not live
+  forever.
+- `resource_group` prevents overlapping deployments to the same environment.
+- The rules skip the default branch, so merging does not create `review/main`.
+- `GIT_STRATEGY: none` lets the stop job run without checking out the source
+  branch again.
+
+### Run The Lab
+
+Create a branch from Lab 11:
+
+```bash
+git switch codex/lab-11-sbom-artifacts
+git switch -c codex/lab-12-review-environments
+```
+
+Commit and push:
+
+```bash
+git add .gitlab-ci.yml scripts/generate_review_deployment.py README.md RUNBOOK.md
+git commit -m "Add review environment deployment record"
+git push -u origin codex/lab-12-review-environments
+```
+
+Open an MR:
+
+```text
+codex/lab-12-review-environments -> main
+```
+
+Expected result:
+
+- The pipeline runs a `deploy_review` job in the `deploy` stage.
+- GitLab creates an environment named like
+  `review/codex-lab-12-review-environments`.
+- The environment URL opens `evidence/review-deployment.html` from the job
+  artifact.
+- A manual `stop_review` job is available.
+
+### Inspect The Environment
+
+Open:
+
+```text
+Operate > Environments
+```
+
+Then inspect the review environment. You should see:
+
+- Environment name.
+- Last deployment.
+- Commit and pipeline.
+- Open button for the artifact-backed URL.
+- Stop action.
+
+Lab 12 takeaway:
+
+```text
+Environments connect CI/CD automation to deployment state. Even before using a
+real cloud target, GitLab can track what was deployed, from which commit, and
+how to stop temporary review environments.
+```
+
+## 20. Lab Change Ledger
 
 Use this section when you want to repeat the labs from scratch or explain what
 changed in each lab.
@@ -2353,7 +2526,104 @@ Docker base image:
 - python:3.13.13-alpine3.22
 ```
 
-## 20. Repeatability Notes
+### Lab 12: Review Environments And Deployment Records
+
+Files changed:
+
+```text
+.gitlab-ci.yml
+scripts/generate_review_deployment.py
+README.md
+RUNBOOK.md
+```
+
+Purpose:
+
+```text
+Create a GitLab review environment and attach a deployment evidence artifact.
+```
+
+CI additions:
+
+```yaml
+stages:
+  - verify
+  - evidence
+  - build
+  - test
+  - dast
+  - deploy
+
+deploy_review:
+  stage: deploy
+  image: python:3.13-alpine
+  resource_group: review/$CI_COMMIT_REF_SLUG
+  rules:
+    - if: '$CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
+  script:
+    - python scripts/generate_review_deployment.py
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - evidence/review-deployment.html
+      - evidence/review-deployment.json
+  environment:
+    name: review/$CI_COMMIT_REF_SLUG
+    url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/evidence/review-deployment.html"
+    on_stop: stop_review
+    auto_stop_in: 1 day
+
+stop_review:
+  stage: deploy
+  image: alpine:3.20
+  resource_group: review/$CI_COMMIT_REF_SLUG
+  variables:
+    GIT_STRATEGY: none
+  rules:
+    - if: '$CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
+      when: manual
+      allow_failure: true
+  script:
+    - 'echo "Stopping review environment: $CI_ENVIRONMENT_NAME"'
+  environment:
+    name: review/$CI_COMMIT_REF_SLUG
+    action: stop
+```
+
+Commands:
+
+```bash
+git switch codex/lab-11-sbom-artifacts
+git switch -c codex/lab-12-review-environments
+git add .gitlab-ci.yml scripts/generate_review_deployment.py README.md RUNBOOK.md
+git commit -m "Add review environment deployment record"
+git push -u origin codex/lab-12-review-environments
+```
+
+Local verification:
+
+```bash
+python3 scripts/generate_review_deployment.py
+python3 -m json.tool evidence/review-deployment.json
+python3 -m py_compile scripts/generate_review_deployment.py
+```
+
+Expected GitLab result:
+
+```text
+The deploy_review job creates a review environment with a URL that points to the
+deployment evidence HTML artifact. A manual stop_review job is available to stop
+the environment.
+```
+
+Observed result:
+
+```text
+Record the environment and pipeline result after the pipeline finishes.
+```
+
+## 21. Repeatability Notes
 
 For every future lab, record:
 
@@ -2369,7 +2639,7 @@ Prefer recording lab instructions in this runbook rather than adding historical
 comments inside application source files. Source comments should explain current
 code behavior; the runbook should explain the learning journey.
 
-## 21. Useful Daily Git Commands
+## 22. Useful Daily Git Commands
 
 Check current branch and file state:
 
@@ -2413,7 +2683,7 @@ Push a new branch and set upstream:
 git push -u origin BRANCH_NAME
 ```
 
-## 22. What To Remember
+## 23. What To Remember
 
 - A local commit does not run a GitLab pipeline until it is pushed.
 - GitLab creates pipelines from `.gitlab-ci.yml`.
@@ -2446,6 +2716,11 @@ git push -u origin BRANCH_NAME
 - Provenance ties evidence to a source revision and pipeline run.
 - GitLab job artifacts are part of the audit trail. Download and inspect them
   when learning a new scanner or report type.
+- GitLab environments track deployment state separately from pipeline status.
+- Review environments should usually be temporary and should have an explicit
+  stop path.
+- A simulated deployment is useful for learning GitLab's environment lifecycle
+  before connecting a real cloud target.
 - Repeatable labs need a change ledger: files touched, exact snippets, commands,
   expected GitLab result, and cleanup steps.
 - Keep risky training code isolated and clearly marked as intentionally unsafe.
