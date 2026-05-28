@@ -2620,7 +2620,32 @@ the environment.
 Observed result:
 
 ```text
-Record the environment and pipeline result after the pipeline finishes.
+Pipeline #2557231037 passed with 10 jobs.
+
+The pipeline showed the expected stages:
+
+- verify
+- evidence
+- build
+- test
+- dast
+- deploy
+
+The deploy stage included:
+
+- deploy_review
+- stop_review
+
+The review deployment artifact opened successfully and showed:
+
+- Project: collibra-group/Collibra-project
+- Branch: codex/lab-12-review-environments
+- Commit: f9e254200cc52a8b3e8f2f6150d961a2426009fc
+- Pipeline: 2557231037
+- Job: 14571967888
+- Environment: review/codex-lab-12-review-environments
+- Container image:
+  registry.gitlab.com/collibra-group/collibra-project:f9e254200cc52a8b3e8f2f6150d961a2426009fc
 ```
 
 ## 21. Repeatability Notes
