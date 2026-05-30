@@ -1631,7 +1631,161 @@ real cloud target, GitLab can track what was deployed, from which commit, and
 how to stop temporary review environments.
 ```
 
-## 20. Lab Change Ledger
+## 20. Lab 13: Production Deployment Gates
+
+Lab 13 adds a controlled production deployment path.
+
+Goal:
+
+```text
+Create a manual production deployment job that only appears on the default
+branch, then protect the production environment in GitLab so production
+promotion becomes an intentional approval step.
+```
+
+### Why This Matters
+
+Review environments are temporary and branch-scoped. Production is different:
+
+- It should deploy from trusted branches, usually `main`.
+- It should be manual or policy-controlled.
+- It should have a deployment record.
+- It should restrict who can trigger or approve it.
+
+This lab still uses a simulated deployment artifact. The important concept is
+the GitLab control plane: environment, manual job, protected environment, and
+deployment evidence.
+
+### Generalize Deployment Evidence
+
+Add `scripts/generate_deployment_record.py`.
+
+This reusable script writes deployment evidence based on CI variables and these
+optional variables:
+
+```text
+DEPLOYMENT_RECORD_BASENAME
+DEPLOYMENT_RECORD_TITLE
+DEPLOYMENT_RECORD_DESCRIPTION
+DEPLOYMENT_TYPE
+```
+
+Keep `scripts/generate_review_deployment.py` as a small wrapper so Lab 12 still
+works:
+
+```python
+os.environ.setdefault("DEPLOYMENT_RECORD_BASENAME", "review-deployment")
+os.environ.setdefault("DEPLOYMENT_RECORD_TITLE", "Review Deployment Evidence")
+os.environ.setdefault("DEPLOYMENT_TYPE", "simulated-review-environment")
+```
+
+### Add The Production Job
+
+Add a manual production deployment job:
+
+```yaml
+deploy_production:
+  stage: deploy
+  image: python:3.13-alpine
+  resource_group: production
+  variables:
+    DEPLOYMENT_RECORD_BASENAME: production-deployment
+    DEPLOYMENT_RECORD_TITLE: Production Deployment Evidence
+    DEPLOYMENT_RECORD_DESCRIPTION: This lab creates a manual production deployment gate without deploying to cloud infrastructure.
+    DEPLOYMENT_TYPE: simulated-production-deployment
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: manual
+      allow_failure: false
+  script:
+    - python scripts/generate_deployment_record.py
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - evidence/production-deployment.html
+      - evidence/production-deployment.json
+  environment:
+    name: production
+    url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/evidence/production-deployment.html"
+    deployment_tier: production
+```
+
+Important details:
+
+- The job appears only when the branch is the default branch.
+- In the MR pipeline, the job should not appear. That is expected.
+- After merge, the `main` pipeline should show `deploy_production` as a manual
+  job.
+- `allow_failure: false` makes the manual job a real gate, not a skipped
+  optional task.
+- `resource_group: production` prevents overlapping production deployments.
+- `deployment_tier: production` marks the environment as a production tier.
+
+### Protect The Production Environment
+
+In GitLab, open:
+
+```text
+Settings > CI/CD > Protected environments
+```
+
+Create or edit the `production` protected environment:
+
+- Environment: `production`
+- Allowed to deploy: Maintainers
+- Deployment approvals: require 1 approval if the UI offers it
+
+This setting is project configuration, not a file in the repo. The `.gitlab-ci.yml`
+creates the production job and environment; GitLab settings decide who is allowed
+to deploy to that environment.
+
+### Run The Lab
+
+Create a branch from Lab 12:
+
+```bash
+git switch codex/lab-12-review-environments
+git switch -c codex/lab-13-production-gates
+```
+
+Commit and push:
+
+```bash
+git add .gitlab-ci.yml scripts/generate_deployment_record.py scripts/generate_review_deployment.py README.md RUNBOOK.md
+git commit -m "Add production deployment gate"
+git push -u origin codex/lab-13-production-gates
+```
+
+Open an MR:
+
+```text
+codex/lab-13-production-gates -> main
+```
+
+Expected MR pipeline result:
+
+- Normal security and evidence jobs pass.
+- `deploy_review` runs for the branch.
+- `deploy_production` does not appear because this is not `main`.
+
+After merging to `main`:
+
+- Open the latest `main` pipeline.
+- Confirm `deploy_production` appears as a manual job.
+- Trigger it if your protected environment settings allow you to deploy.
+- Inspect the generated `production-deployment.html` artifact.
+- Open `Operate > Environments > production`.
+
+Lab 13 takeaway:
+
+```text
+Production deployment should be a controlled promotion from verified code, not
+just another automatic branch job. GitLab environments and protected
+environments let the platform enforce that boundary.
+```
+
+## 21. Lab Change Ledger
 
 Use this section when you want to repeat the labs from scratch or explain what
 changed in each lab.
@@ -2648,7 +2802,94 @@ The review deployment artifact opened successfully and showed:
   registry.gitlab.com/collibra-group/collibra-project:f9e254200cc52a8b3e8f2f6150d961a2426009fc
 ```
 
-## 21. Repeatability Notes
+### Lab 13: Production Deployment Gates
+
+Files changed:
+
+```text
+.gitlab-ci.yml
+scripts/generate_deployment_record.py
+scripts/generate_review_deployment.py
+README.md
+RUNBOOK.md
+```
+
+Purpose:
+
+```text
+Add a manual production deployment job and document protected environment
+configuration.
+```
+
+CI additions:
+
+```yaml
+deploy_production:
+  stage: deploy
+  image: python:3.13-alpine
+  resource_group: production
+  variables:
+    DEPLOYMENT_RECORD_BASENAME: production-deployment
+    DEPLOYMENT_RECORD_TITLE: Production Deployment Evidence
+    DEPLOYMENT_RECORD_DESCRIPTION: This lab creates a manual production deployment gate without deploying to cloud infrastructure.
+    DEPLOYMENT_TYPE: simulated-production-deployment
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      when: manual
+      allow_failure: false
+  script:
+    - python scripts/generate_deployment_record.py
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - evidence/production-deployment.html
+      - evidence/production-deployment.json
+  environment:
+    name: production
+    url: "$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/evidence/production-deployment.html"
+    deployment_tier: production
+```
+
+Commands:
+
+```bash
+git switch codex/lab-12-review-environments
+git switch -c codex/lab-13-production-gates
+git add .gitlab-ci.yml scripts/generate_deployment_record.py scripts/generate_review_deployment.py README.md RUNBOOK.md
+git commit -m "Add production deployment gate"
+git push -u origin codex/lab-13-production-gates
+```
+
+Local verification:
+
+```bash
+python3 scripts/generate_review_deployment.py
+DEPLOYMENT_RECORD_BASENAME=production-deployment \
+  DEPLOYMENT_RECORD_TITLE="Production Deployment Evidence" \
+  DEPLOYMENT_RECORD_DESCRIPTION="This lab creates a manual production deployment gate without deploying to cloud infrastructure." \
+  DEPLOYMENT_TYPE=simulated-production-deployment \
+  CI_ENVIRONMENT_NAME=production \
+  python3 scripts/generate_deployment_record.py
+python3 -m json.tool evidence/production-deployment.json
+python3 -m py_compile scripts/generate_deployment_record.py scripts/generate_review_deployment.py
+```
+
+Expected GitLab result:
+
+```text
+The MR pipeline does not show deploy_production. After merge, the main pipeline
+shows deploy_production as a manual job tied to the production environment.
+```
+
+Observed result:
+
+```text
+Record the main pipeline and protected environment result after the lab
+finishes.
+```
+
+## 22. Repeatability Notes
 
 For every future lab, record:
 
@@ -2664,7 +2905,7 @@ Prefer recording lab instructions in this runbook rather than adding historical
 comments inside application source files. Source comments should explain current
 code behavior; the runbook should explain the learning journey.
 
-## 22. Useful Daily Git Commands
+## 23. Useful Daily Git Commands
 
 Check current branch and file state:
 
@@ -2708,7 +2949,7 @@ Push a new branch and set upstream:
 git push -u origin BRANCH_NAME
 ```
 
-## 23. What To Remember
+## 24. What To Remember
 
 - A local commit does not run a GitLab pipeline until it is pushed.
 - GitLab creates pipelines from `.gitlab-ci.yml`.
@@ -2746,6 +2987,11 @@ git push -u origin BRANCH_NAME
   stop path.
 - A simulated deployment is useful for learning GitLab's environment lifecycle
   before connecting a real cloud target.
+- Production deployment jobs should usually be limited to the default branch.
+- Protected environments are GitLab project settings that control who can deploy
+  to sensitive environments such as production.
+- Manual production jobs are gates. They are useful only when paired with clear
+  ownership, approvals, and evidence.
 - Repeatable labs need a change ledger: files touched, exact snippets, commands,
   expected GitLab result, and cleanup steps.
 - Keep risky training code isolated and clearly marked as intentionally unsafe.
