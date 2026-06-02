@@ -1785,7 +1785,187 @@ just another automatic branch job. GitLab environments and protected
 environments let the platform enforce that boundary.
 ```
 
-## 21. Lab Change Ledger
+## 21. Lab 14: Release Governance With Tags
+
+Lab 14 adds GitLab Releases.
+
+Goal:
+
+```text
+Create a release only from an immutable Git tag, then attach links to the
+pipeline, SBOM, build provenance, release evidence, and container registry.
+```
+
+### Why This Matters
+
+Branches move. Tags are version markers. A release process should answer:
+
+- Which version was released?
+- Which commit does that version point to?
+- Which pipeline verified it?
+- Which image, SBOM, and provenance evidence support it?
+
+This lab creates releases from tags only. That separates normal branch/MR work
+from versioned release promotion.
+
+### Add A Release Stage
+
+Add a final `release` stage:
+
+```yaml
+stages:
+  - verify
+  - evidence
+  - build
+  - test
+  - dast
+  - deploy
+  - release
+```
+
+### Add Release Evidence
+
+Add `scripts/generate_release_evidence.py`.
+
+The script writes:
+
+```text
+evidence/release-evidence.html
+evidence/release-evidence.json
+```
+
+The release evidence records:
+
+- Release tag.
+- Commit SHA.
+- Pipeline ID.
+- Container image repository and tag.
+- Links to SBOM and build provenance artifacts.
+
+Add the evidence job:
+
+```yaml
+generate_release_evidence:
+  stage: evidence
+  image: python:3.13-alpine
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  script:
+    - python scripts/generate_release_evidence.py
+    - python -m json.tool evidence/release-evidence.json > /tmp/release-evidence.validated.json
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - evidence/release-evidence.html
+      - evidence/release-evidence.json
+```
+
+### Add The Release Job
+
+Add the GitLab release job:
+
+```yaml
+create_release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/cli:latest
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  script:
+    - 'echo "Creating GitLab release for $CI_COMMIT_TAG"'
+  release:
+    tag_name: "$CI_COMMIT_TAG"
+    name: "Release $CI_COMMIT_TAG"
+    description: "Release $CI_COMMIT_TAG for $CI_PROJECT_PATH at $CI_COMMIT_SHA. Review the linked pipeline, SBOM, provenance, and release evidence before treating this as production-ready."
+    assets:
+      links:
+        - name: Release evidence
+          url: "$CI_PROJECT_URL/-/jobs/artifacts/$CI_COMMIT_TAG/file/evidence/release-evidence.html?job=generate_release_evidence"
+        - name: CycloneDX SBOM
+          url: "$CI_PROJECT_URL/-/jobs/artifacts/$CI_COMMIT_TAG/file/evidence/training-sbom.cdx.json?job=generate_sbom"
+        - name: Build provenance
+          url: "$CI_PROJECT_URL/-/jobs/artifacts/$CI_COMMIT_TAG/file/evidence/build-provenance.json?job=generate_sbom"
+        - name: Pipeline
+          url: "$CI_PIPELINE_URL"
+        - name: Container registry
+          url: "$CI_PROJECT_URL/container_registry"
+```
+
+Important details:
+
+- `rules: if: '$CI_COMMIT_TAG'` means release jobs run only for tags.
+- Branch and MR pipelines should not create releases.
+- The release job uses GitLab's CLI image because the `release` keyword needs a
+  release-capable tool in the job image.
+- Release assets are links to evidence, not proof by themselves. Review the
+  linked pipeline and artifacts.
+
+### Run The Lab
+
+Create a branch from Lab 13:
+
+```bash
+git switch codex/lab-13-production-gates
+git switch -c codex/lab-14-release-governance
+```
+
+Commit and push:
+
+```bash
+git add .gitlab-ci.yml scripts/generate_release_evidence.py README.md RUNBOOK.md
+git commit -m "Add tag-based release governance"
+git push -u origin codex/lab-14-release-governance
+```
+
+Open an MR:
+
+```text
+codex/lab-14-release-governance -> main
+```
+
+Expected MR pipeline result:
+
+- Normal branch jobs run.
+- `generate_release_evidence` does not run.
+- `create_release` does not run.
+
+After merging to `main`, create a version tag:
+
+```bash
+git switch main
+git pull --ff-only origin main
+git tag -a v0.1.0 -m "GitLab DevSecOps lab release v0.1.0"
+git push origin v0.1.0
+```
+
+Expected tag pipeline result:
+
+- The tag pipeline runs security and evidence jobs.
+- `generate_release_evidence` publishes release evidence artifacts.
+- `create_release` creates a GitLab Release for `v0.1.0`.
+
+Inspect:
+
+```text
+Deploy > Releases
+```
+
+Then open the release and inspect the linked:
+
+- Pipeline.
+- Release evidence.
+- CycloneDX SBOM.
+- Build provenance.
+- Container registry.
+
+Lab 14 takeaway:
+
+```text
+Releases are versioned promises. A release should be tied to an immutable tag,
+a verified pipeline, and evidence that explains what was shipped.
+```
+
+## 22. Lab Change Ledger
 
 Use this section when you want to repeat the labs from scratch or explain what
 changed in each lab.
@@ -2885,11 +3065,119 @@ shows deploy_production as a manual job tied to the production environment.
 Observed result:
 
 ```text
-Record the main pipeline and protected environment result after the lab
-finishes.
+The MR branch pipeline passed.
+
+After the MR was merged, the latest main pipeline became blocked because the
+manual deploy_production gate was waiting for action:
+
+- Main pipeline: #2564451159
+- Status: Blocked
+- Commit: 4d54a616
+- Branch: main
+
+This is the expected Lab 13 result. The blocked status means GitLab did not
+automatically promote the verified build to production. A maintainer must
+intentionally run or approve the production deployment job.
 ```
 
-## 22. Repeatability Notes
+### Lab 14: Release Governance With Tags
+
+Files changed:
+
+```text
+.gitlab-ci.yml
+scripts/generate_release_evidence.py
+README.md
+RUNBOOK.md
+```
+
+Purpose:
+
+```text
+Create GitLab Releases only from version tags and attach release evidence links.
+```
+
+CI additions:
+
+```yaml
+stages:
+  - verify
+  - evidence
+  - build
+  - test
+  - dast
+  - deploy
+  - release
+
+generate_release_evidence:
+  stage: evidence
+  image: python:3.13-alpine
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  script:
+    - python scripts/generate_release_evidence.py
+    - python -m json.tool evidence/release-evidence.json > /tmp/release-evidence.validated.json
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - evidence/release-evidence.html
+      - evidence/release-evidence.json
+
+create_release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/cli:latest
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  script:
+    - 'echo "Creating GitLab release for $CI_COMMIT_TAG"'
+  release:
+    tag_name: "$CI_COMMIT_TAG"
+    name: "Release $CI_COMMIT_TAG"
+```
+
+Commands:
+
+```bash
+git switch codex/lab-13-production-gates
+git switch -c codex/lab-14-release-governance
+git add .gitlab-ci.yml scripts/generate_release_evidence.py README.md RUNBOOK.md
+git commit -m "Add tag-based release governance"
+git push -u origin codex/lab-14-release-governance
+```
+
+Tag commands after merge:
+
+```bash
+git switch main
+git pull --ff-only origin main
+git tag -a v0.1.0 -m "GitLab DevSecOps lab release v0.1.0"
+git push origin v0.1.0
+```
+
+Local verification:
+
+```bash
+CI_COMMIT_TAG=v0.1.0 python3 scripts/generate_release_evidence.py
+python3 -m json.tool evidence/release-evidence.json
+python3 -m py_compile scripts/generate_release_evidence.py
+```
+
+Expected GitLab result:
+
+```text
+The MR pipeline does not create a release. After merge, pushing a version tag
+starts a tag pipeline, publishes release evidence, and creates a GitLab Release
+for the tag.
+```
+
+Observed result:
+
+```text
+Record the tag pipeline and release result after the lab finishes.
+```
+
+## 23. Repeatability Notes
 
 For every future lab, record:
 
@@ -2905,7 +3193,7 @@ Prefer recording lab instructions in this runbook rather than adding historical
 comments inside application source files. Source comments should explain current
 code behavior; the runbook should explain the learning journey.
 
-## 23. Useful Daily Git Commands
+## 24. Useful Daily Git Commands
 
 Check current branch and file state:
 
@@ -2949,7 +3237,7 @@ Push a new branch and set upstream:
 git push -u origin BRANCH_NAME
 ```
 
-## 24. What To Remember
+## 25. What To Remember
 
 - A local commit does not run a GitLab pipeline until it is pushed.
 - GitLab creates pipelines from `.gitlab-ci.yml`.
@@ -2992,6 +3280,11 @@ git push -u origin BRANCH_NAME
   to sensitive environments such as production.
 - Manual production jobs are gates. They are useful only when paired with clear
   ownership, approvals, and evidence.
+- Branches move; tags are version markers.
+- A release should point to an immutable tag and link to the evidence that
+  supports the release.
+- Creating a GitLab Release is not the same as deploying production. Release,
+  deployment, and rollback are related but separate controls.
 - Repeatable labs need a change ledger: files touched, exact snippets, commands,
   expected GitLab result, and cleanup steps.
 - Keep risky training code isolated and clearly marked as intentionally unsafe.

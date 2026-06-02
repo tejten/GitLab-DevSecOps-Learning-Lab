@@ -1,0 +1,19 @@
+{
+  "generated_at": "2026-06-02T22:38:39.296750+00:00",
+  "project": "collibra-group/Collibra-project",
+  "project_url": "https://gitlab.com/collibra-group/Collibra-project",
+  "release_tag": "v0.1.0",
+  "commit_sha": "local-release-test",
+  "pipeline_id": "local-pipeline",
+  "pipeline_url": "https://gitlab.com/collibra-group/Collibra-project/-/pipelines/local-pipeline",
+  "job_id": "local-job",
+  "container_image": {
+    "repository": "registry.gitlab.com/collibra-group/collibra-project",
+    "tag": "local-release-test"
+  },
+  "artifact_links": {
+    "release_evidence": "https://gitlab.com/collibra-group/Collibra-project/-/jobs/artifacts/v0.1.0/file/evidence/release-evidence.html?job=generate_release_evidence",
+    "sbom": "https://gitlab.com/collibra-group/Collibra-project/-/jobs/artifacts/v0.1.0/file/evidence/training-sbom.cdx.json?job=generate_sbom",
+    "build_provenance": "https://gitlab.com/collibra-group/Collibra-project/-/jobs/artifacts/v0.1.0/file/evidence/build-provenance.json?job=generate_sbom"
+  }
+}

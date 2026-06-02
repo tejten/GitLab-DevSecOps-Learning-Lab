@@ -162,3 +162,28 @@ The twelfth lab adds deployment visibility:
 
 This is where DevSecOps shifts from "the build exists" to "GitLab can track
 where a change was reviewed, when it was deployed, and how to stop it."
+
+## Lab 13
+
+The thirteenth lab adds a production deployment gate:
+
+- Add a manual `deploy_production` job that appears only on `main`.
+- Create a production environment record.
+- Publish production deployment evidence artifacts.
+- Configure GitLab protected environment approvals in the UI.
+
+This is where DevSecOps shifts from "review changes safely" to "control who can
+promote a verified build to production."
+
+## Lab 14
+
+The fourteenth lab adds release governance:
+
+- Create releases only from Git tags.
+- Generate release evidence for the tagged commit.
+- Create a GitLab Release with links to the pipeline, SBOM, provenance, and
+  release evidence.
+- Practice treating a release tag as an immutable version marker.
+
+This is where DevSecOps shifts from "we can deploy a commit" to "we can explain
+which version was released and what evidence supports it."
